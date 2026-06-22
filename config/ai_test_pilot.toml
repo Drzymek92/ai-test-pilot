@@ -1,0 +1,43 @@
+# AI Test Pilot — committed defaults. Env overrides secrets; CLI flags override per run.
+# Loaded + validated by scripts/config.py (pydantic-settings) so a bad config fails fast.
+# M1 reads [run] and [generation]; [triage]/[tuning]/[ledger] are placeholders for M2+.
+
+[run]
+adapter        = "python_pytest"
+scenario_count = 6
+model_tier     = "bulk"          # LLM task tier (cheap | bulk | accurate); informational in M1
+prompt_version = "v1"            # M1 pins v1; "auto" (ledger-best) lands in M2
+output_dir     = "scripts/outputs"
+
+[generation]
+temperature       = 0.2
+compress_prompt   = false        # route long introspection prompts via prompt_compressor (M2+)
+repair_retries    = 1            # re-ask once on schema-invalid JSON
+use_context       = true         # auto-detect agent/project.md|README near the target for value semantics
+context_max_chars = 2000         # bound the injected domain-context excerpt (token budget)
+golden            = false        # characterization mode: run each call once + lock asserts to the captured result (opt-in)
+
+# ── data-factory fixture provider (integration feature) ──────────────────────
+# When enabled, data-processing targets get realistic synthetic inputs from
+# synthetic-data-factory instead of LLM-guessed literals. Off by default; opt in
+# per run with --fixtures or by flipping `enabled`.
+[fixtures]
+enabled       = false
+project_path  = "../synthetic-data-factory"   # relative to this project root
+domain        = ""                            # data-factory domain YAML name; "" = let the LLM pick a shape
+rows          = 8                             # synthetic rows to request per fixture
+
+# ── M2: triage + self-tracking ledger + propose tuning ───────────────────────
+[triage]
+enabled              = true
+llm_for_ambiguous    = true          # false = deterministic-only (zero triage tokens)
+confidence_threshold = 0.6
+
+[tuning]
+mode                   = "propose"   # off | propose (auto deferred to M5)
+min_runs_for_selection = 5
+escalate_below_accept  = 0.5         # acceptance below this on a target → suggest a stronger tier
+
+[ledger]
+backend = "duckdb"
+path    = "scripts/outputs/runs.duckdb"

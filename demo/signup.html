@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Sign up — AI Test Pilot demo</title>
+</head>
+<body>
+  <h1>Create your account</h1>
+
+  <form id="signup-form" novalidate>
+    <label>Email <input id="email" name="email" type="email" data-testid="email" placeholder="you@example.com" /></label>
+    <label>Password <input id="password" name="password" type="password" data-testid="password" placeholder="min 6 chars" /></label>
+    <button id="submit" type="submit" data-testid="submit">Sign up</button>
+  </form>
+
+  <p id="message" data-testid="message" role="status"></p>
+  <div id="dashboard" data-testid="dashboard" hidden>
+    <h2>Welcome aboard!</h2>
+    <button id="logout" data-testid="logout">Log out</button>
+  </div>
+
+  <script>
+    const form = document.getElementById('signup-form');
+    const message = document.getElementById('message');
+    const dashboard = document.getElementById('dashboard');
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+
+      if (!emailOk) {
+        message.textContent = 'Please enter a valid email address.';
+        return;
+      }
+      if (password.length < 6) {
+        message.textContent = 'Password must be at least 6 characters.';
+        return;
+      }
+      message.textContent = 'Account created for ' + email + '.';
+      dashboard.hidden = false;
+    });
+
+    document.getElementById('logout').addEventListener('click', () => {
+      dashboard.hidden = true;
+      message.textContent = '';
+      form.reset();
+    });
+  </script>
+</body>
+</html>

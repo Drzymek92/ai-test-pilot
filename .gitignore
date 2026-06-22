@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Secrets & local config — never commit
+.env
+config/.env
+
+# Generated artifacts & data
+scripts/outputs/
+logs/
+*.duckdb
+
+# Portfolio diff snapshots (publisher-internal)
+.baseline_facts.json
+.current_facts.json
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
