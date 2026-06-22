@@ -5,8 +5,8 @@
 [run]
 adapter        = "python_pytest"
 scenario_count = 6
-model_tier     = "bulk"          # LLM task tier (cheap | bulk | accurate); informational in M1
-prompt_version = "v1"            # M1 pins v1; "auto" (ledger-best) lands in M2
+model_tier     = "bulk"          # FuelIX task tier (cheap | bulk | accurate); informational in M1
+prompt_version = "v1"            # pin a version, or "auto" = deterministic ledger-best for this adapter
 output_dir     = "scripts/outputs"
 
 [generation]
@@ -34,9 +34,15 @@ llm_for_ambiguous    = true          # false = deterministic-only (zero triage t
 confidence_threshold = 0.6
 
 [tuning]
-mode                   = "propose"   # off | propose (auto deferred to M5)
+mode                   = "propose"   # off | propose | auto (auto = propose + accepted-scenario few-shot, M5)
 min_runs_for_selection = 5
 escalate_below_accept  = 0.5         # acceptance below this on a target → suggest a stronger tier
+# auto mode (M5): inject previously-ACCEPTED scenarios for the same target as few-shot exemplars.
+# Deterministic — reads persisted scenario JSON, no extra LLM call. Use `prompt_version = "auto"`
+# in [run] for the deterministic ledger-best prompt-version selection (the other half of auto-tuning).
+fewshot_min_rate       = 0.6         # only reuse exemplars from runs with acceptance >= this
+fewshot_max_examples   = 3           # max accepted scenarios to inject
+fewshot_max_chars      = 1500        # token-budget bound on the exemplar block
 
 [ledger]
 backend = "duckdb"

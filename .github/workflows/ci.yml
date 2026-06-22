@@ -1,3 +1,7 @@
+# CI runs the full unit suite, which is browser-free by design: the web_playwright tests
+# assert on the GENERATED test source (emit/contract level), so no Chromium is needed here.
+# Live browser runs (the --serve demos in demo/login_app and demo/ws_app) are exercised
+# locally after `python -m playwright install chromium`, not in CI.
 name: CI
 
 on:

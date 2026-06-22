@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Log in — AI Test Pilot deep demo</title>
+</head>
+<body>
+  <h1>Sign in</h1>
+
+  <!--
+    Deep-Playwright demo target. Unlike signup.html this talks to a backend:
+    the form POSTs to /api/login via fetch(), so tests must INTERCEPT that
+    request (page.route) to drive success/failure deterministically, and the
+    auth token is persisted in localStorage so a saved storage_state can skip
+    the login flow entirely.
+  -->
+  <form id="login-form" novalidate>
+    <label>Email
+      <input id="email" name="email" type="email" data-testid="email" placeholder="you@example.com" />
+    </label>
+    <label>Password
+      <input id="password" name="password" type="password" data-testid="password" placeholder="your password" />
+    </label>
+    <button id="submit" type="submit" data-testid="submit">Log in</button>
+  </form>
+
+  <p id="message" data-testid="message" role="status"></p>
+
+  <div id="dashboard" data-testid="dashboard" hidden>
+    <h2 id="welcome" data-testid="welcome"></h2>
+    <button id="logout" data-testid="logout">Log out</button>
+  </div>
+
+  <script>
+    const form = document.getElementById('login-form');
+    const message = document.getElementById('message');
+    const dashboard = document.getElementById('dashboard');
+    const welcome = document.getElementById('welcome');
+
+    // Render the logged-in state from a persisted token (this is what a
+    // restored storage_state drives — no network call, no form submit).
+    function renderSession() {
+      const user = localStorage.getItem('user');
+      if (localStorage.getItem('token') && user) {
+        welcome.textContent = 'Welcome back, ' + user;
+        dashboard.hidden = false;
+        form.hidden = true;
+      }
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      message.textContent = '';
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        if (!res.ok) {
+          message.textContent = 'Invalid email or password.';
+          return;
+        }
+        const data = await res.json();
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', data.user);
+        renderSession();
+      } catch (err) {
+        message.textContent = 'Network error — please try again.';
+      }
+    });
+
+    document.getElementById('logout').addEventListener('click', () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      dashboard.hidden = true;
+      form.hidden = false;
+      form.reset();
+      message.textContent = 'You have been logged out.';
+    });
+
+    renderSession();
+  </script>
+</body>
+</html>

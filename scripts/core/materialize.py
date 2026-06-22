@@ -33,6 +33,13 @@ def materialize(
     os.replace(tmp, out_path)   # atomic rename
     logger.info("Wrote %d test(s) -> %s", len(scenario_set.scenarios), out_path)
 
+    # Optional sibling files (e.g. web adapter served mode → a conftest.py carrying fixtures).
+    if hasattr(adapter, "extra_files"):
+        for fname, fsrc in adapter.extra_files(contract, scenario_set).items():
+            extra_path = out_path.parent / fname
+            extra_path.write_text(fsrc, encoding="utf-8")
+            logger.info("Wrote sibling file -> %s", extra_path)
+
     # Optional artifact export (e.g. web adapter → idiomatic TypeScript Playwright).
     if hasattr(adapter, "typescript"):
         ts_path = out_path.with_suffix(".spec.ts")

@@ -47,9 +47,12 @@ class TriageCfg(BaseModel):
 
 class TuningCfg(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    mode: str = "propose"             # off | propose (auto deferred to M5)
+    mode: str = "propose"             # off | propose | auto (auto = propose + accepted-scenario few-shot)
     min_runs_for_selection: int = 5
     escalate_below_accept: float = 0.5
+    fewshot_min_rate: float = 0.6     # auto: only reuse exemplars from runs with acceptance >= this
+    fewshot_max_examples: int = 3     # auto: max accepted scenarios to inject as exemplars
+    fewshot_max_chars: int = 1500     # auto: token-budget bound on the exemplar block
 
 
 class LedgerCfg(BaseModel):

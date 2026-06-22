@@ -69,6 +69,9 @@ class TargetContract(BaseModel):
     module: str | None = None         # importable module path the units live in (python adapter)
     units: list[UnitSpec]
     types: dict[str, TypeSpec] = Field(default_factory=dict)   # closure of constructible param types
+    serve_dir: str | None = None      # web: dir to serve over localhost http (enables base_url/auth_state fixtures + storage_state)
+    page_path: str | None = None      # web: served page path appended to base_url, e.g. "/index.html"
+    page_features: list[str] = Field(default_factory=list)   # web: detected capabilities, e.g. ["api", "websocket"]
 
 
 class TmpFile(BaseModel):
@@ -86,10 +89,15 @@ class TmpFile(BaseModel):
 class WebAction(BaseModel):
     """One structured step in a web (Playwright) scenario — rendered deterministically to code."""
     action: Literal["click", "fill", "check", "select", "press",
-                    "expect_text", "expect_visible", "expect_hidden", "expect_value", "expect_url"]
+                    "expect_text", "expect_visible", "expect_hidden", "expect_value", "expect_url",
+                    "route", "expect_request", "route_ws", "expect_ws_message"]
     selector: str | None = None       # CSS / text= selector from the contract's elements
     value: str | None = None          # fill/select/press value, or expected value/url
-    text: str | None = None           # expected text for expect_text
+    text: str | None = None           # expected text for expect_text / expect_ws_message
+    # network interception (route) / assertion (expect_request) — the "advanced Playwright" path
+    url_pattern: str | None = None    # glob matched against request/websocket URLs, e.g. "**/api/login"
+    status: int | None = None         # route: HTTP status to fulfill the stubbed response with
+    body: str | None = None           # route: HTTP response body; route_ws: message pushed to the client on connect
 
 
 class TestScenario(BaseModel):
@@ -107,8 +115,9 @@ class TestScenario(BaseModel):
     assertion: str | None = None      # concrete boolean expression over `result`, e.g. "result == []"
     expect_error: str | None = None   # exception type expected instead of a return, e.g. "ValueError"
     rationale: str = ""               # why this case matters (audit trail)
-    tags: list[str] = Field(default_factory=list)          # happy_path | edge | error | regression
+    tags: list[str] = Field(default_factory=list)          # happy_path | edge | error | regression | async
     fixture: str | None = None        # name of a data-factory fixture feeding `inputs`, if any
+    storage_state: bool = False       # web: start from a logged-in context (auth_state fixture) instead of logging in
 
 
 class ScenarioSet(BaseModel):

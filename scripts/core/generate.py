@@ -1,6 +1,6 @@
 """Stage 2 — GENERATE. The one genuinely fuzzy step: the LLM proposes scenarios.
 
-Deterministic scaffolding around a single LLM call: build a prompt from the
+Deterministic scaffolding around a single FuelIX call: build a prompt from the
 introspection contract, call the gateway, then parse + validate the response into a
 schema-checked ScenarioSet. Invalid JSON or schema violations trigger one repair retry
 (ARCHITECTURE.md §2/§4). The LLM only ever returns JSON — code is rendered later.
@@ -110,6 +110,7 @@ def generate_scenarios(
     repair_retries: int = 1,
     fixture_block: str = "",
     context_block: str = "",
+    fewshot_block: str = "",
 ) -> ScenarioSet:
     kind = getattr(adapter, "prompt_kind", "python")
     describe = getattr(adapter, "describe_contract", None)
@@ -121,6 +122,7 @@ def generate_scenarios(
         f"{block}\n"
         f"{context_block}"
         f"{fixture_block}"
+        f"{fewshot_block}"
         f"Return ONLY the JSON array."
     )
 

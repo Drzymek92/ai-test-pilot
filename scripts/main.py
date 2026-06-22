@@ -1,12 +1,11 @@
-"""AI Test Pilot — CLI entry point.
+"""AI Test Pilot — CLI entry point (M1).
 
-Pipeline: introspect → generate (LLM→JSON) → materialize → run → triage → record.
-Stages 1/3/4 cost zero tokens; stage 2 is a single batched LLM call.
+Pipeline: introspect → generate (LLM→JSON) → materialize → run → report.
+Stages 1/3/4 cost zero tokens; stage 2 is a single batched FuelIX call.
 
 Examples:
-    python scripts/main.py --target path/to/module.py --selector func_a,func_b
-    python scripts/main.py --target path/to/module.py --golden
-    python scripts/main.py --adapter web_playwright --target path/to/page.html
+    python scripts/main.py --target ../librarian/scripts/extract/extractors.py \
+        --selector _chunk_text,_flatten_json,_split_markdown_sections
     python scripts/main.py --smoke
 """
 from __future__ import annotations
@@ -41,11 +40,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--adapter", help="adapter name (default: from config)")
     p.add_argument("--selector", help="comma-separated function names to scope introspection")
     p.add_argument("--count", type=int, help="max scenarios to request")
-    p.add_argument("--model", help="override the LLM model")
+    p.add_argument("--model", help="override the FuelIX model")
     p.add_argument("--prompt-version", help="prompt version (default: from config)")
     p.add_argument("--config", help="path to ai_test_pilot.toml")
     p.add_argument("--no-run", action="store_true", help="generate + materialize but skip running")
-    p.add_argument("--smoke", action="store_true", help="one tiny live LLM call, then exit")
+    p.add_argument("--smoke", action="store_true", help="one tiny live FuelIX call, then exit")
     # data-factory fixture provider
     p.add_argument("--fixtures", action="store_true",
                    help="seed scenario inputs with realistic data from synthetic-data-factory")
@@ -58,6 +57,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="disable auto-detection of agent/project.md|README domain context")
     p.add_argument("--golden", action="store_true",
                    help="characterization mode: run each call once and lock assertions to the result")
+    # web adapter — deep-Playwright options
+    p.add_argument("--serve", action="store_true",
+                   help="web: serve the target's directory over localhost http so the generated tests "
+                        "get a base_url + auth_state(storage_state) fixture and a real origin")
+    p.add_argument("--web-async", action="store_true",
+                   help="web: tag every scenario `async` so the asyncio Playwright variant is emitted")
     return p.parse_args(argv)
 
 
@@ -138,6 +143,25 @@ def run_pipeline(cfg: AppConfig, args: argparse.Namespace) -> RunReport:
     contract = adapter.introspect(ref)
     logger.info("Introspected %d unit(s) from %s.", len(contract.units), args.target)
 
+    # 1.1 — web served mode: tests get a localhost origin + base_url/auth_state fixtures.
+    if getattr(args, "serve", False):
+        target_path = Path(args.target)
+        contract.serve_dir = str(target_path.resolve().parent)
+        contract.page_path = "/" + target_path.name
+        contract.module = "http://localhost:3000" + contract.page_path  # TS artifact BASE_URL
+        try:
+            page_text = target_path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            page_text = ""
+        feats = []
+        if "fetch(" in page_text or "/api/" in page_text:
+            feats.append("api")
+        if "WebSocket" in page_text:
+            feats.append("websocket")
+        contract.page_features = feats
+        logger.info("Served mode: serving %s, page %s, features=%s",
+                    contract.serve_dir, contract.page_path, feats or "none")
+
     caveats: list[str] = []
     complex_units = [u for u in contract.units if u.complex_params]
     if complex_units:
@@ -187,7 +211,19 @@ def run_pipeline(cfg: AppConfig, args: argparse.Namespace) -> RunReport:
     if pv_note:
         logger.info(pv_note)
 
-    # 2 — GENERATE (one LLM call, schema-validated)
+    # 1.8 — AUTO TUNING (opt-in): inject previously-accepted scenarios as few-shot exemplars.
+    # Deterministic (reads persisted scenario JSON) — no extra LLM call, just a few prompt tokens.
+    fewshot_text = ""
+    fs_note: str | None = None
+    if cfg.tuning.mode == "auto":
+        fewshot_text, fs_note = tuning.fewshot_block(
+            adapter=adapter_name, target=args.target, ledger_path=ledger_path, out_base=out_base,
+            min_rate=cfg.tuning.fewshot_min_rate, max_examples=cfg.tuning.fewshot_max_examples,
+            max_chars=cfg.tuning.fewshot_max_chars)
+        if fs_note:
+            logger.info(fs_note)
+
+    # 2 — GENERATE (one FuelIX call, schema-validated)
     scenario_set = generate_scenarios(
         contract,
         adapter=adapter,
@@ -198,6 +234,7 @@ def run_pipeline(cfg: AppConfig, args: argparse.Namespace) -> RunReport:
         repair_retries=cfg.generation.repair_retries,
         fixture_block=fixture_block,
         context_block=context_block_text,
+        fewshot_block=fewshot_text,
     )
 
     # 2.5 — bind real factory file contents into any `from_fixture` tmp_files (deterministic)
@@ -211,6 +248,12 @@ def run_pipeline(cfg: AppConfig, args: argparse.Namespace) -> RunReport:
         captures = capture_goldens(adapter, contract, scenario_set,
                                    cwd=_PROJECT_ROOT, out_dir=out_base / "tests")
         apply_goldens(scenario_set, captures)
+
+    # web: force the asyncio Playwright variant for every scenario when requested
+    if getattr(args, "web_async", False):
+        for s in scenario_set.scenarios:
+            if "async" not in s.tags:
+                s.tags.append("async")
 
     # persist scenarios JSON
     scen_path = out_base / "scenarios" / f"scenarios_{ts}.json"
@@ -272,6 +315,8 @@ def run_pipeline(cfg: AppConfig, args: argparse.Namespace) -> RunReport:
             adapter=adapter_name, target=args.target, prompt_version=scenario_set.prompt_version,
             triage_counts=triage_counts, ledger_path=ledger_path,
             min_runs=cfg.tuning.min_runs_for_selection, escalate_below=cfg.tuning.escalate_below_accept)
+        if fs_note:
+            tuning_notes = [f"{fs_note} — applied to this run."] + tuning_notes
 
     report.report_file = str(_write_report(
         report, scenario_set, results, out_base / "reports",
@@ -296,10 +341,82 @@ def _accept_cmd(rest: list[str]) -> int:
     return 1
 
 
+def _resolve_draft(arg: str, out_base: Path) -> Path:
+    """A draft is either a path to a generated test file, or a run_id to look one up."""
+    p = Path(arg)
+    if p.is_file():
+        return p
+    matches = [m for m in (out_base / "tests").glob(f"*_{arg}.py")]
+    if matches:
+        return sorted(matches)[0]
+    raise SystemExit(f"No draft test file found for '{arg}' (path or run_id).")
+
+
+def _promote_cmd(rest: list[str]) -> int:
+    """`promote <test_file|run_id> [--into <suite.py>] [--approx]` — clean a draft for the suite."""
+    ap = argparse.ArgumentParser(prog="main.py promote")
+    ap.add_argument("draft", help="path to a generated test file, or a run_id")
+    ap.add_argument("--into", help="existing suite file to append non-duplicate tests into")
+    ap.add_argument("--approx", action="store_true",
+                    help="wrap float-bearing assertions in pytest.approx(...)")
+    ap.add_argument("--config")
+    a = ap.parse_args(rest)
+    cfg = load_config(a.config)
+    out_base = _PROJECT_ROOT / cfg.run.output_dir
+    from scripts.core import promote
+
+    draft_path = _resolve_draft(a.draft, out_base)
+    draft_src = draft_path.read_text(encoding="utf-8")
+
+    if a.into:
+        dest = Path(a.into)
+        if not dest.is_file():
+            raise SystemExit(f"--into target not found: {dest}")
+        summary = promote.promote_into(draft_src, dest, approx=a.approx)
+        print(f"\nPromoted from {draft_path.name} -> {summary['dest']}")
+        print(f"  added:   {', '.join(summary['added']) or '(none)'}")
+        if summary["skipped_duplicates"]:
+            print(f"  skipped (already present): {', '.join(summary['skipped_duplicates'])}")
+        if summary["imports_merged"]:
+            print(f"  imports merged: {', '.join(summary['imports_merged'])}")
+        if summary["imports_added"]:
+            print(f"  imports added:  {', '.join(summary['imports_added'])}")
+        return 0
+
+    cleaned = promote.cleaned_source(draft_src, approx=a.approx)
+    dest = out_base / "promoted" / draft_path.name
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(cleaned, encoding="utf-8")
+    print(f"\nCleaned draft -> {dest}\n  (review, then copy into your suite, or re-run with --into)")
+    return 0
+
+
+def _discover_cmd(rest: list[str]) -> int:
+    """`discover <project_name|path>` — list testable targets across a project's scripts/."""
+    ap = argparse.ArgumentParser(prog="main.py discover")
+    ap.add_argument("project", help="sibling project name (projects/<name>) or a path")
+    ap.add_argument("--config")
+    a = ap.parse_args(rest)
+    cfg = load_config(a.config)
+    from scripts.core import discover as disc
+
+    adapter = registry.get_adapter(cfg.run.adapter)
+    root = disc.resolve_project_root(a.project, sibling_base=_PROJECT_ROOT.parent)
+    if not root.is_dir():
+        raise SystemExit(f"Project not found: {a.project} (looked under {_PROJECT_ROOT.parent})")
+    reports = disc.discover(root, adapter)
+    print(disc.format_report(root, reports))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "accept":
         return _accept_cmd(argv[1:])
+    if argv and argv[0] == "promote":
+        return _promote_cmd(argv[1:])
+    if argv and argv[0] == "discover":
+        return _discover_cmd(argv[1:])
 
     args = _parse_args(argv)
 
@@ -307,10 +424,10 @@ def main(argv: list[str] | None = None) -> int:
         from scripts.llm_client import smoke_test
         try:
             reply = smoke_test(model=args.model)
-            logger.info("LLM smoke OK — reply: %r", reply.strip())
+            logger.info("FuelIX smoke OK — reply: %r", reply.strip())
             return 0
         except Exception:
-            logger.exception("LLM smoke test FAILED.")
+            logger.exception("FuelIX smoke test FAILED.")
             return 1
 
     try:

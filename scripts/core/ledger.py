@@ -2,7 +2,8 @@
 
 Every generation run appends a RunRecord; `accept` backfills how many tests the human kept.
 The ledger answers, deterministically: which prompt version / model tier actually produces tests
-you keep, per adapter and target. A small, queryable self-tracking catalog. Zero tokens.
+you keep, per adapter and target. Mirrors the token_usage.csv / librarian-catalog pattern. Zero
+tokens. DuckDB is a lightweight embedded analytical database (a single pinned dependency).
 """
 from __future__ import annotations
 
@@ -91,6 +92,31 @@ def prompt_version_stats(adapter: str, path: str | Path) -> list[tuple[str, floa
             [adapter],
         ).fetchall()
         return [(r[0], float(r[1]), int(r[2])) for r in rows]
+    finally:
+        con.close()
+
+
+def best_accepted_runs(adapter: str, target: str, path: str | Path, *,
+                       min_rate: float = 0.6, limit: int = 3) -> list[tuple[str, float]]:
+    """[(run_id, acceptance_rate)] for this adapter+target with acceptance >= min_rate.
+
+    Best-and-most-recent first. Drives M5 `auto` mode: the run_ids point at persisted
+    scenario JSONs to reuse as few-shot exemplars. Empty if the ledger has no accepted
+    history for this target yet.
+    """
+    p = Path(path)
+    if not p.is_file():
+        return []
+    con = _connect(path)
+    try:
+        rows = con.execute(
+            "SELECT run_id, acceptance_rate FROM runs "
+            "WHERE adapter = ? AND target = ? AND acceptance_rate IS NOT NULL "
+            "AND acceptance_rate >= ? "
+            "ORDER BY acceptance_rate DESC, ts DESC LIMIT ?",
+            [adapter, target, min_rate, limit],
+        ).fetchall()
+        return [(r[0], float(r[1])) for r in rows]
     finally:
         con.close()
 

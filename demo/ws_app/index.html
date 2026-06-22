@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Live updates — AI Test Pilot websocket demo</title>
+</head>
+<body>
+  <h1>Live updates</h1>
+
+  <!--
+    Event-driven demo target. The page opens a WebSocket to ws://<host>/ws and
+    renders both server-PUSHED messages (event-driven, no user action) and the
+    echo of messages the user sends. Tests MOCK the socket server in-process via
+    Playwright's page.route_web_socket(...) — no real ws backend needed — so the
+    push/echo behaviour is fully deterministic.
+  -->
+  <button id="connect" data-testid="connect">Connect</button>
+  <p id="status" data-testid="status" role="status">disconnected</p>
+
+  <form id="send-form">
+    <label>Message
+      <input id="msg" name="msg" data-testid="msg" placeholder="say something" />
+    </label>
+    <button id="send" data-testid="send" type="submit">Send</button>
+  </form>
+
+  <ul id="feed" data-testid="feed"></ul>
+
+  <script>
+    let ws = null;
+    const status = document.getElementById('status');
+    const feed = document.getElementById('feed');
+
+    function add(text) {
+      const li = document.createElement('li');
+      li.textContent = text;
+      feed.appendChild(li);
+    }
+
+    document.getElementById('connect').addEventListener('click', () => {
+      ws = new WebSocket('ws://' + location.host + '/ws');
+      ws.onopen = () => { status.textContent = 'connected'; };
+      ws.onmessage = (e) => { add(e.data); };
+      ws.onclose = () => { status.textContent = 'disconnected'; };
+    });
+
+    document.getElementById('send-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const value = document.getElementById('msg').value.trim();
+      if (ws && ws.readyState === WebSocket.OPEN && value) {
+        ws.send(value);
+        document.getElementById('msg').value = '';
+      }
+    });
+  </script>
+</body>
+</html>
