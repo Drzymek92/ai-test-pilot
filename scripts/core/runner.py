@@ -17,7 +17,8 @@ from scripts.logger import get_logger
 
 logger = get_logger("runner")
 
-_CAP = 1500   # truncate captured output per test
+_CAP = 1500          # truncate captured output per test
+_TIMEOUT_BUFFER = 10.0   # seconds added to the per-test budget for pytest startup/collection
 
 
 def _build_cmd(adapter: ModuleType, test_path: Path, junit: Path) -> list[str]:
@@ -60,11 +61,28 @@ def run_tests(
     scenario_set: ScenarioSet,
     *,
     cwd: Path | None = None,
+    per_test_timeout: float | None = None,
 ) -> list[RunResult]:
     junit = test_path.with_suffix(".junit.xml")
     cmd = _build_cmd(adapter, test_path, junit)
     logger.info("Running: %s", " ".join(cmd))
-    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(cwd) if cwd else None)
+
+    # P2 — bound the run so one hanging generated test can't hang the whole pipeline.
+    # No pytest-timeout plugin here (no admin), so cap the subprocess at the per-test budget
+    # times the scenario count (+ startup buffer); on expiry every scenario is error/timeout.
+    timeout = None
+    if per_test_timeout and per_test_timeout > 0:
+        timeout = per_test_timeout * max(1, len(scenario_set.scenarios)) + _TIMEOUT_BUFFER
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True,
+                              cwd=str(cwd) if cwd else None, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        junit.unlink(missing_ok=True)
+        logger.error("Run exceeded the %.0fs budget -- killed; marking all scenarios timed-out.",
+                     timeout)
+        return [RunResult(scenario_id=s.id, status="error", signal="timeout",
+                          captured=f"Run exceeded the {timeout:.0f}s time budget and was killed.")
+                for s in scenario_set.scenarios]
     parsed = _parse_junit(junit)
     junit.unlink(missing_ok=True)
 

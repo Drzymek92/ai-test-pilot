@@ -55,9 +55,16 @@ def _eligible(contract: TargetContract, scenario_set: ScenarioSet):
     return out
 
 
+_PROBE_TIMEOUT = 60   # seconds — defense-in-depth (P6): the probe executes the TARGET's own code
+
+
 def _run_probe(probe: Path, python_executable: str | None, cwd: Path) -> tuple[dict[str, dict], str]:
-    proc = subprocess.run([python_executable or sys.executable, str(probe)],
-                          cwd=str(cwd), capture_output=True, text=True)
+    try:
+        proc = subprocess.run([python_executable or sys.executable, str(probe)],
+                              cwd=str(cwd), capture_output=True, text=True, timeout=_PROBE_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        logger.warning("Golden probe exceeded %ds — skipping characterization this run.", _PROBE_TIMEOUT)
+        return {}, "probe timed out"
     out: dict[str, dict] = {}
     for line in proc.stdout.splitlines():
         line = line.strip()

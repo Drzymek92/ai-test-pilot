@@ -13,8 +13,9 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from scripts.core import cache as scenario_cache
 from scripts.core.models import ScenarioSet, TargetContract, TestScenario
-from scripts.llm_client import llm_call
+from scripts.llm_client import llm_call, resolve_model
 from scripts.logger import get_logger
 
 logger = get_logger("generate")
@@ -30,7 +31,14 @@ def _system_prompt(prompt_version: str, kind: str = "python") -> str:
     return path.read_text(encoding="utf-8")
 
 
-def _contract_block(contract: TargetContract) -> str:
+def _truncate_source(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars].rsplit("\n", 1)[0] + "\n# ...(source truncated for token budget)"
+
+
+def _contract_block(contract: TargetContract, *, include_source: bool = True,
+                    source_max_chars: int = 1200) -> str:
     lines = [f"Module: {contract.module}", ""]
     for u in contract.units:
         lines.append(f"### {u.name}{u.signature or '()'}")
@@ -39,10 +47,18 @@ def _contract_block(contract: TargetContract) -> str:
         if u.docstring:
             lines.append(f"- docstring: {u.docstring.strip()}")
         else:
-            lines.append("- docstring: NONE — exact behaviour is unspecified; assert invariants "
-                         "(type/shape/length), NOT guessed exact values; tag such scenarios 'uncertain'")
+            lines.append("- docstring: NONE — derive behaviour from the source below; if still "
+                         "uncertain assert invariants (type/shape/length), NOT guessed exact "
+                         "values, and tag such scenarios 'uncertain'")
         if u.raises:
             lines.append(f"- raises: {', '.join(u.raises)}")
+        if include_source and u.source:
+            # P3a: the unit's own code, so assertions can target SPECIFIC computed behaviour.
+            lines.append("- source (the code under test — base assertions on what it actually "
+                         "computes, not the function name):")
+            lines.append("```python")
+            lines.append(_truncate_source(u.source, source_max_chars))
+            lines.append("```")
         if not u.is_pure:
             lines.append("- IMPURE (file/IO/side effects): do NOT pass a path that does not exist. "
                          "Use `tmp_files` to create real inputs, or restrict to cases needing no file.")
@@ -55,14 +71,26 @@ def _contract_block(contract: TargetContract) -> str:
 
     if contract.types:
         lines.append("## Constructible types (build these with the $type grammar — NOT plain dicts)")
+        has_constraints = False
         for t in contract.types.values():
             if t.kind == "enum":
                 lines.append(f"- enum {t.name}: members {', '.join(t.enum_members)} "
                              f'(use {{"$enum": "{t.name}.<MEMBER>"}})')
             else:
-                fld = ", ".join(
-                    f"{f.name}: {f.annotation}{' =default' if f.has_default else ''}" for f in t.fields)
-                lines.append(f"- {t.kind} {t.name}({fld})")
+                parts = []
+                for f in t.fields:
+                    seg = f"{f.name}: {f.annotation}"
+                    if f.constraint:                      # P3b-2: respect the value constraints
+                        seg += f" [{f.constraint}]"
+                        has_constraints = True
+                    if f.has_default:
+                        seg += " =default"
+                    parts.append(seg)
+                lines.append(f"- {t.kind} {t.name}({', '.join(parts)})")
+        if has_constraints:
+            lines.append("  NOTE: fields in [brackets] carry constraints (e.g. [gt=0] = strictly "
+                         "greater than 0, [min_length=1] = non-empty) — choose values that SATISFY "
+                         "them, or the object fails to construct.")
         lines.append("")
     return "\n".join(lines)
 
@@ -105,16 +133,25 @@ def generate_scenarios(
     adapter=None,
     count: int = 6,
     model: str | None = None,
-    temperature: float = 0.2,
+    temperature: float = 0.0,
     prompt_version: str = "v1",
     repair_retries: int = 1,
     fixture_block: str = "",
     context_block: str = "",
     fewshot_block: str = "",
+    cache_dir: Path | None = None,
+    use_cache: bool = False,
+    refresh_cache: bool = False,
+    llm_timeout: float | None = None,
+    llm_retries: int = 2,
+    include_source: bool = True,
+    source_max_chars: int = 1200,
+    budget=None,
 ) -> ScenarioSet:
     kind = getattr(adapter, "prompt_kind", "python")
     describe = getattr(adapter, "describe_contract", None)
-    block = describe(contract) if describe else _contract_block(contract)
+    block = describe(contract) if describe else _contract_block(
+        contract, include_source=include_source, source_max_chars=source_max_chars)
     system = _system_prompt(prompt_version, kind)
     noun = "Playwright web" if kind == "web" else "pytest"
     human = (
@@ -126,22 +163,51 @@ def generate_scenarios(
         f"Return ONLY the JSON array."
     )
 
+    # P1 — reproducibility: replay an identical (target + prompt + model + temp + count) run.
+    key = scenario_cache.cache_key(
+        system=system, human=human, model=resolve_model(model),
+        temperature=temperature, count=count)
+    if use_cache and cache_dir is not None and not refresh_cache:
+        cached = scenario_cache.load(cache_dir, key)
+        if cached is not None:
+            cached.tokens_in = cached.tokens_out = 0      # P4: a replay spends nothing this run
+            return cached
+
+    # P4-2 — estimate before spending; enforce the per-run cap (cache miss only).
+    if budget is not None and budget.enabled:
+        from scripts.core import budget as budget_mod
+        est = budget_mod.estimate_call(system, human, adapter=getattr(adapter, "name", "python_pytest"),
+                                       count=count, budget=budget)
+        budget_mod.enforce(est["total"], budget.max_tokens_per_run,
+                           on_over=budget.on_over, scope="run")
+
     last_err: Exception | None = None
     prompt = human
+    spent_in = spent_out = 0
     for attempt in range(repair_retries + 1):
-        raw = llm_call(prompt, system=system, model=model, temperature=temperature)
+        res = llm_call(prompt, system=system, model=model, temperature=temperature,
+                       timeout=llm_timeout, retries=llm_retries, return_usage=True)
+        # Real client returns (text, usage); tolerate a plain-string return (test fakes).
+        raw, usage = res if isinstance(res, tuple) else (res, {"input_tokens": 0, "output_tokens": 0})
+        spent_in += usage["input_tokens"]
+        spent_out += usage["output_tokens"]
         try:
             scenarios = _parse_scenarios(raw, contract)
             logger.info(
                 "Generated %d scenario(s) for %s (attempt %d).",
                 len(scenarios), contract.ref.locator, attempt + 1,
             )
-            return ScenarioSet(
+            scenario_set = ScenarioSet(
                 target=contract.ref,
                 scenarios=scenarios,
                 model=model or "",
                 prompt_version=prompt_version,
+                tokens_in=spent_in,
+                tokens_out=spent_out,
             )
+            if use_cache and cache_dir is not None:
+                scenario_cache.store(cache_dir, key, scenario_set)
+            return scenario_set
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
             last_err = exc
             logger.warning("Scenario parse failed (attempt %d): %s", attempt + 1, exc)

@@ -4,9 +4,14 @@ CLI entry point + the orchestration that every interface reuses. `run_pipeline(c
 single function the MCP server (`mcp_server.py`) also calls — so there is one pipeline, not two.
 
 ## Entry points
-- `main(argv)` — dispatches: `accept <run_id> --kept N` → `_accept_cmd` (ledger backfill);
-  `--smoke` → one LLM call; otherwise `load_config` → `run_pipeline` → print summary + caveats.
+- `main(argv)` — dispatches by first token: `accept <run_id> --kept N` → `_accept_cmd` (ledger
+  backfill); `promote <run_id|file>` → `_promote_cmd`; `discover <project>` → `_discover_cmd`;
+  otherwise `--smoke` → one LLM call, or `load_config` → `run_pipeline` → print summary + caveats.
 - `_accept_cmd(rest)` — its own argparse; calls `ledger.backfill_acceptance`.
+- `_discover_cmd(rest)` — `discover <project|path>` lists testable-now vs needs-fixtures targets
+  across a project's `scripts/` (ast-only, zero tokens). `--changed` / `--since <ref>` restrict the
+  scan to git-changed modules (`discover.git_changed_py` → `only=` filter) — the incremental path:
+  regenerate tests only for what moved. Errors if the target isn't a git work tree.
 - `_parse_args` — all flags: target/adapter/selector/count/model/prompt-version, `--no-run`,
   `--golden`, fixtures (`--fixtures`/`--fixture-domain`/`--fixture-entity`/`--fixture-rows`),
   context (`--context`/`--no-context`).

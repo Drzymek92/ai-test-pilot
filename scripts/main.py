@@ -3,6 +3,18 @@
 Pipeline: introspect → generate (LLM→JSON) → materialize → run → report.
 Stages 1/3/4 cost zero tokens; stage 2 is a single batched LLM call.
 
+Exit-code contract (P2 — usable non-interactively / in CI):
+    0  success — the tool ran, generated tests, and wrote a report (the pass/fail of the
+       *generated* tests is in the report, not the exit code; a generated-test failure is a
+       triage finding, not a tool error).
+    1  internal/unexpected error.
+    2  usage error (bad arguments / missing --target) — argparse's own code.
+    3  target error — the module can't be introspected (missing, unreadable, syntax error);
+       a clean 'skip with reason', not a crash.
+    4  LLM error — generation failed after retries/timeout; the tool never half-generates.
+    5  quality regression — the `quality` gate found a metric regression vs the baseline (P5).
+    6  budget exceeded — an estimate exceeded the token cap with on_over=abort (P4).
+
 Examples:
     python scripts/main.py --target ../librarian/scripts/extract/extractors.py \
         --selector _chunk_text,_flatten_json,_split_markdown_sections
@@ -20,6 +32,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scripts.config import AppConfig, load_config
 from scripts.core import registry
+from scripts.core.budget import Budget
+from scripts.core.errors import BudgetError, LLMError, TargetError
 from scripts.core.generate import generate_scenarios
 from scripts.core.materialize import materialize
 from scripts.core.models import RunReport, RunResult, ScenarioSet, TargetRef
@@ -28,6 +42,24 @@ from scripts.logger import get_logger
 
 logger = get_logger("main")
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# Exit-code contract (see module docstring + LIMITATIONS.md).
+EXIT_OK = 0
+EXIT_INTERNAL = 1
+EXIT_TARGET = 3
+EXIT_LLM = 4
+EXIT_QUALITY = 5
+EXIT_BUDGET = 6
+
+
+def _budget(cfg: AppConfig) -> Budget:
+    b = cfg.budget
+    return Budget(
+        max_tokens_per_run=b.max_tokens_per_run, max_tokens_per_sweep=b.max_tokens_per_sweep,
+        on_over=b.on_over, price_in=b.price_per_mtok_in, price_out=b.price_per_mtok_out,
+        default_out_per_scenario=b.default_out_per_scenario,
+        ledger_path=_PROJECT_ROOT / cfg.ledger.path,
+    )
 
 
 def _timestamp() -> str:
@@ -45,6 +77,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--config", help="path to ai_test_pilot.toml")
     p.add_argument("--no-run", action="store_true", help="generate + materialize but skip running")
     p.add_argument("--smoke", action="store_true", help="one tiny live LLM call, then exit")
+    # P1 — reproducibility: scenario cache/lock
+    p.add_argument("--no-cache", action="store_true",
+                   help="bypass the scenario cache (always call the LLM; don't read or write the cache)")
+    p.add_argument("--refresh-cache", action="store_true",
+                   help="ignore any cached scenarios and regenerate, overwriting the cache entry")
     # data-factory fixture provider
     p.add_argument("--fixtures", action="store_true",
                    help="seed scenario inputs with realistic data from synthetic-data-factory")
@@ -55,6 +92,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--context", help="explicit path to a project.md/README to use as domain context")
     p.add_argument("--no-context", action="store_true",
                    help="disable auto-detection of agent/project.md|README domain context")
+    p.add_argument("--no-cut-source", action="store_true",
+                   help="don't feed the unit's own source into generation (P3a CUT context is on by default)")
     p.add_argument("--golden", action="store_true",
                    help="characterization mode: run each call once and lock assertions to the result")
     # web adapter — deep-Playwright options
@@ -139,8 +178,12 @@ def run_pipeline(cfg: AppConfig, args: argparse.Namespace) -> RunReport:
     out_base = (_PROJECT_ROOT / cfg.run.output_dir)
     ts = _timestamp()
 
-    # 1 — INTROSPECT (deterministic, zero tokens)
-    contract = adapter.introspect(ref)
+    # 1 — INTROSPECT (deterministic, zero tokens). A malformed/missing target is a clean
+    # 'skip with reason' (exit 3), not a crash — important when sweeping a whole project (P2).
+    try:
+        contract = adapter.introspect(ref)
+    except (SyntaxError, FileNotFoundError, UnicodeDecodeError) as exc:
+        raise TargetError(f"cannot introspect {args.target}: {type(exc).__name__}: {exc}") from exc
     logger.info("Introspected %d unit(s) from %s.", len(contract.units), args.target)
 
     # 1.1 — web served mode: tests get a localhost origin + base_url/auth_state fixtures.
@@ -223,7 +266,7 @@ def run_pipeline(cfg: AppConfig, args: argparse.Namespace) -> RunReport:
         if fs_note:
             logger.info(fs_note)
 
-    # 2 — GENERATE (one LLM call, schema-validated)
+    # 2 — GENERATE (one LLM call, schema-validated; cached for reproducibility — P1)
     scenario_set = generate_scenarios(
         contract,
         adapter=adapter,
@@ -235,6 +278,14 @@ def run_pipeline(cfg: AppConfig, args: argparse.Namespace) -> RunReport:
         fixture_block=fixture_block,
         context_block=context_block_text,
         fewshot_block=fewshot_text,
+        cache_dir=out_base / "cache",
+        use_cache=cfg.generation.cache and not args.no_cache,
+        refresh_cache=args.refresh_cache,
+        llm_timeout=cfg.generation.llm_timeout,
+        llm_retries=cfg.generation.llm_retries,
+        include_source=cfg.generation.cut_source and not args.no_cut_source,
+        source_max_chars=cfg.generation.cut_source_max_chars,
+        budget=_budget(cfg),
     )
 
     # 2.5 — bind real factory file contents into any `from_fixture` tmp_files (deterministic)
@@ -268,7 +319,8 @@ def run_pipeline(cfg: AppConfig, args: argparse.Namespace) -> RunReport:
     # 4 — RUN (deterministic) — run from this project root so `pytest` + sys.path bootstrap work
     results: list[RunResult] = []
     if not args.no_run:
-        results = run_tests(adapter, test_path, scenario_set, cwd=_PROJECT_ROOT)
+        results = run_tests(adapter, test_path, scenario_set, cwd=_PROJECT_ROOT,
+                            per_test_timeout=cfg.generation.per_test_timeout)
 
     # 5 — TRIAGE (deterministic table + LLM only for ambiguous failures)
     verdicts: list = []
@@ -296,16 +348,22 @@ def run_pipeline(cfg: AppConfig, args: argparse.Namespace) -> RunReport:
         fixture_file=fixture_path,
         context_file=context_path,
         caveats=caveats,
+        tokens_in=scenario_set.tokens_in,
+        tokens_out=scenario_set.tokens_out,
     )
 
     # 6 — RECORD to the ledger (self-tracking)
+    from scripts.core import budget as budget_mod
     from scripts.core import ledger
     from scripts.core.models import RunRecord
+    cost_est = budget_mod.cost(scenario_set.tokens_in, scenario_set.tokens_out, _budget(cfg))
+    report.cost_est = cost_est
     ledger.append(RunRecord(
         run_id=report.run_id, ts=report.ts, adapter=adapter_name, target=args.target,
         model=scenario_set.model, prompt_version=scenario_set.prompt_version,
         generated=report.generated, passed=report.passed, failed=report.failed + report.errored,
         triage=triage_counts,
+        tokens_in=scenario_set.tokens_in, tokens_out=scenario_set.tokens_out, cost_est=cost_est,
     ), ledger_path)
 
     # 7 — TUNE (propose): deterministic suggestions for the report
@@ -427,6 +485,111 @@ def _discover_cmd(rest: list[str]) -> int:
     return 0
 
 
+def _quality_cmd(rest: list[str]) -> int:
+    """`quality [--manifest p] [--update-baseline] [--tol N]` — run the curated quality gate (P5).
+
+    Exit 0 = pass (or baseline just set), 5 = a metric regressed vs the baseline.
+    """
+    ap = argparse.ArgumentParser(prog="main.py quality")
+    ap.add_argument("--manifest", help="path to a quality_targets.toml (default: benchmark/)")
+    ap.add_argument("--update-baseline", action="store_true",
+                    help="store the current panel as the new baseline (and pass)")
+    ap.add_argument("--tol", type=float, default=0.0, help="ignore metric moves of this size or less")
+    ap.add_argument("--config")
+    a = ap.parse_args(rest)
+    cfg = load_config(a.config)
+    from scripts.core import quality
+    manifest = Path(a.manifest) if a.manifest else None
+    result = quality.run_quality(cfg, _PROJECT_ROOT, manifest=manifest,
+                                 update_baseline=a.update_baseline, tol=a.tol)
+    p = result["panel"]
+    print(f"\nQuality gate — model {result['model'] or '(default)'}")
+    print(f"  coverage={p['coverage']}  pass_rate={p['pass_rate']}  fp_rate={p['fp_rate']}  "
+          f"error_rate={p['error_rate']}  smell_density={p['smell_density']}  acceptance={p['acceptance']}")
+    print(f"  report: {result['report_md']}")
+    if result.get("baseline_updated"):
+        print("  baseline updated.")
+        return EXIT_OK
+    if not result["baseline_compared"]:
+        print("  no baseline yet — run with --update-baseline to set one.")
+        return EXIT_OK
+    if result["gate_pass"]:
+        print("  PASS — no regression vs baseline.")
+        return EXIT_OK
+    print(f"  REGRESSION on: {', '.join(result['comparison']['regressed'])}")
+    return EXIT_QUALITY
+
+
+def _sweep_run_ns(target: str, selector: str) -> argparse.Namespace:
+    return argparse.Namespace(
+        target=target, adapter=None, selector=selector, count=None, model=None, prompt_version=None,
+        no_run=False, fixtures=False, fixture_domain=None, fixture_entity=None, fixture_rows=None,
+        context=None, no_context=False, golden=False, serve=False, web_async=False,
+        no_cache=False, refresh_cache=False, no_cut_source=False)
+
+
+def _sweep_cmd(rest: list[str]) -> int:
+    """`sweep <project> [--since REF] [--all]` — "test the diff": generate tests for the git-changed
+    (default) testable modules of a project, under the per-sweep token cap (P4-3)."""
+    ap = argparse.ArgumentParser(prog="main.py sweep")
+    ap.add_argument("project", help="sibling project name (projects/<name>) or a path")
+    ap.add_argument("--since", metavar="REF", help="changed since a git ref (default: working tree vs HEAD)")
+    ap.add_argument("--all", action="store_true", help="sweep every testable module, not just git-changed")
+    ap.add_argument("--config")
+    a = ap.parse_args(rest)
+    cfg = load_config(a.config)
+    from scripts.core import budget as budget_mod
+    from scripts.core import discover as disc
+
+    adapter = registry.get_adapter(cfg.run.adapter)
+    root = disc.resolve_project_root(a.project, sibling_base=_PROJECT_ROOT.parent)
+    if not root.is_dir():
+        raise SystemExit(f"Project not found: {a.project} (looked under {_PROJECT_ROOT.parent})")
+
+    only = None
+    if not a.all:
+        only = disc.git_changed_py(root, since=a.since)
+        if only is None:
+            raise SystemExit(f"Not a git work tree: {root}. Use --all to sweep everything.")
+        if not only:
+            print("No changed Python files — nothing to sweep.")
+            return EXIT_OK
+    reports = [r for r in disc.discover(root, adapter, only=only) if r.testable]
+    if not reports:
+        print("No testable-now modules in scope.")
+        return EXIT_OK
+
+    bud = _budget(cfg)
+    total_in = total_out = 0
+    rows: list[str] = []
+    rc = EXIT_OK
+    for r in reports:
+        if bud.max_tokens_per_sweep > 0 and (total_in + total_out) >= bud.max_tokens_per_sweep:
+            note = (f"sweep cap {bud.max_tokens_per_sweep} reached after "
+                    f"{total_in + total_out} tokens — stopping before {r.rel}.")
+            (logger.error if bud.on_over == "abort" else logger.warning)(note)
+            rc = EXIT_BUDGET if bud.on_over == "abort" else rc
+            rows.append(f"  (stopped: budget cap reached before {r.rel})")
+            break
+        try:
+            rep = run_pipeline(cfg, _sweep_run_ns(r.target_path(root), ",".join(r.testable)))
+        except (TargetError, LLMError, BudgetError) as exc:
+            rows.append(f"  {r.rel}: skipped ({type(exc).__name__})")
+            continue
+        total_in += rep.tokens_in
+        total_out += rep.tokens_out
+        cached = " [cached]" if rep.tokens_in == 0 and rep.tokens_out == 0 else ""
+        rows.append(f"  {r.rel}: {rep.passed}/{rep.generated} pass · {rep.failed} fail · "
+                    f"{rep.errored} err · {rep.tokens_in + rep.tokens_out} tok{cached}")
+
+    spend = budget_mod.cost(total_in, total_out, bud)
+    print("\nSweep — test the diff:")
+    print("\n".join(rows))
+    print(f"  TOTAL spend: {total_in}+{total_out} tokens"
+          + (f" (~${spend:.4f})" if spend else ""))
+    return rc
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "accept":
@@ -435,6 +598,10 @@ def main(argv: list[str] | None = None) -> int:
         return _promote_cmd(argv[1:])
     if argv and argv[0] == "discover":
         return _discover_cmd(argv[1:])
+    if argv and argv[0] == "quality":
+        return _quality_cmd(argv[1:])
+    if argv and argv[0] == "sweep":
+        return _sweep_cmd(argv[1:])
 
     args = _parse_args(argv)
 
@@ -442,7 +609,7 @@ def main(argv: list[str] | None = None) -> int:
         from scripts.llm_client import smoke_test
         try:
             reply = smoke_test(model=args.model)
-            logger.info("LLM smoke OK - reply: %r", reply.strip())
+            logger.info("LLM smoke OK — reply: %r", reply.strip())
             return 0
         except Exception:
             logger.exception("LLM smoke test FAILED.")
@@ -451,19 +618,32 @@ def main(argv: list[str] | None = None) -> int:
     try:
         cfg = load_config(args.config)
         report = run_pipeline(cfg, args)
+    except TargetError as exc:
+        logger.error("Target skipped: %s", exc)        # exit 3 — not a tool bug
+        return EXIT_TARGET
+    except LLMError as exc:
+        logger.error("Generation aborted: %s", exc)     # exit 4 — never half-generated
+        return EXIT_LLM
+    except BudgetError as exc:
+        logger.error("Budget guardrail: %s", exc)        # exit 6 — deliberate over-cap stop
+        return EXIT_BUDGET
     except Exception:
         logger.exception("Pipeline failed.")
-        return 1
+        return EXIT_INTERNAL
 
     for c in report.caveats:
         print(f"\n⚠️  {c}")
+    spend = (f"  spend:  {report.tokens_in}+{report.tokens_out} tokens"
+             + (f" (~${report.cost_est:.4f})" if report.cost_est else "")
+             + (" [cached: 0 this run]" if report.tokens_in == 0 and report.tokens_out == 0 else ""))
     print(
         f"\n✓ {report.passed} passed · {report.failed} failed · {report.errored} error "
         f"/ {report.generated} generated\n"
         f"  tests:  {report.test_file}\n"
-        f"  report: {report.report_file}"
+        f"  report: {report.report_file}\n"
+        f"{spend}"
     )
-    return 0
+    return EXIT_OK
 
 
 if __name__ == "__main__":

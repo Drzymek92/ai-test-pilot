@@ -63,23 +63,25 @@ def git_changed_py(project_root: Path, since: str | None = None) -> set[Path] | 
     working tree + index against HEAD ("what I've touched"). Returns a set of absolute Paths, or
     None if the project isn't in a git work tree (caller falls back to a full scan).
     """
+    # P6: every git child is bounded (timeout=30); any failure → None (caller does a full scan).
     try:
         top = subprocess.run(
             ["git", "-C", str(project_root), "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, check=True,
+            capture_output=True, text=True, check=True, timeout=30,
         ).stdout.strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return None  # not a git repo, or git unavailable
-    repo_root = Path(top)
+        repo_root = Path(top)
 
-    diff_args = ["git", "-C", str(project_root), "diff", "--name-only"]
-    diff_args += [since] if since else ["HEAD"]
-    names = subprocess.run(diff_args, capture_output=True, text=True, check=True).stdout.splitlines()
-    if since is None:  # working-tree mode also includes brand-new (untracked) modules
-        names += subprocess.run(
-            ["git", "-C", str(project_root), "ls-files", "--others", "--exclude-standard"],
-            capture_output=True, text=True, check=True,
-        ).stdout.splitlines()
+        diff_args = ["git", "-C", str(project_root), "diff", "--name-only"]
+        diff_args += [since] if since else ["HEAD"]
+        names = subprocess.run(diff_args, capture_output=True, text=True, check=True,
+                               timeout=30).stdout.splitlines()
+        if since is None:  # working-tree mode also includes brand-new (untracked) modules
+            names += subprocess.run(
+                ["git", "-C", str(project_root), "ls-files", "--others", "--exclude-standard"],
+                capture_output=True, text=True, check=True, timeout=30,
+            ).stdout.splitlines()
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return None  # not a git repo, git unavailable, or git hung
 
     proj = project_root.resolve()
     changed: set[Path] = set()

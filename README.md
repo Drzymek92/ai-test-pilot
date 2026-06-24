@@ -6,7 +6,7 @@
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Tests](https://img.shields.io/badge/tests-92%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-133%20passing-brightgreen)
 [![CI](https://github.com/Drzymek92/ai-test-pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/Drzymek92/ai-test-pilot/actions/workflows/ci.yml)
 
 ## Overview
@@ -31,9 +31,18 @@ target is a single new file with zero changes to the core:
 - **Structured-output pipeline** — the LLM returns JSON validated against a Pydantic schema (with a
   one-shot repair retry); code is generated from the validated objects, never written by the model.
 - **Typed-input construction** — recursively resolves a function's parameter *types* from source
-  (dataclass + Pydantic, nested, `Decimal`/`datetime`/`Enum`, defaults) via `ast` — **without
-  importing the target** — and builds real constructor calls. Lets it test domain/OO code, not just
-  functions taking primitives.
+  (dataclass + Pydantic + `attrs` + `NamedTuple`, nested, `Decimal`/`datetime`/`Enum`, defaults) via
+  `ast` — **without importing the target** — and builds real constructor calls. It even surfaces
+  Pydantic field constraints (`gt`/`le`/`min_length`, `Annotated[...]`) so the model picks
+  *valid* values instead of triggering a construction-time `ValidationError`. Lets it test
+  domain/OO code, not just functions taking primitives.
+- **Reproducible generation** — generation runs at `temperature=0` and caches each scenario set keyed
+  by the prompt + resolved model version + temperature, so re-running an unchanged target replays the
+  *identical* tests at zero token cost; a model change invalidates the cache. `--no-cache` /
+  `--refresh-cache` override it.
+- **Assertion strength from source** — the unit's own code is fed into generation (a bounded slice),
+  so assertions target *specific computed behaviour*, not just type/shape. `--golden` then locks the
+  real result; together they turn a draft into a regression guard.
 - **Characterization (golden) mode** — runs each call and locks the assertion to the real
   result, turning a generated test into a regression guard. Guarded against time-bombs: it
   double-runs and keeps only reproducible results, skipping any clock/RNG-reading unit whose
@@ -57,6 +66,16 @@ target is a single new file with zero changes to the core:
   the non-duplicate tests into an existing suite. Both deterministic, zero-token.
 - **MCP server** — exposes the engine as tools (`introspect`, `generate_tests`, `triage_failures`,
   `run_metrics`, `accept_run`) so it's callable from any MCP client.
+- **Fail-safe by contract** — the LLM call has a timeout + exponential-backoff retry and raises
+  rather than ever emit a half-generated suite; a per-test run cap bounds a hanging test; and the CLI
+  has a documented **exit-code contract** (`0` ok · `1` internal · `2` usage · `3` uninspectable
+  target · `4` LLM failure · `5` quality regression · `6` budget exceeded) for scripting.
+- **Quality regression gate** — `quality` runs a curated known-good target set and reports a metric
+  panel (coverage, pass-rate, false-positive rate, error rate, test-smell density, acceptance), gated
+  against a stored baseline so a generation/prompt change that regresses quality fails loudly.
+- **Cost guardrails** — every run measures and records real token spend (a cache replay is free);
+  opt-in `[budget]` caps abort before overspending, and `sweep` "tests the diff" by generating only
+  for git-changed modules under a per-sweep cap.
 
 ## How it works
 
@@ -178,6 +197,17 @@ python scripts/main.py discover path/to/project --since main        # vs a ref /
 
 # clean a draft for the suite: strip boilerplate, rewrite golden locks, append non-duplicates
 python scripts/main.py promote <run_id> --into tests/test_module.py
+
+# force a fresh (uncached) generation, or regenerate + overwrite the cache
+python scripts/main.py --target path/to/module.py --no-cache       # bypass the scenario cache
+python scripts/main.py --target path/to/module.py --refresh-cache  # regenerate and re-store
+
+# quality gate: run the curated set, print the metric panel, fail (exit 5) on regression
+python scripts/main.py quality                       # gate vs baseline
+python scripts/main.py quality --update-baseline     # (re)set the baseline
+
+# "test the diff": generate only for git-changed modules in a project, under a budget cap
+python scripts/main.py sweep path/to/project --since main
 ```
 
 Run as an **MCP server** (callable from any MCP client) — register it with:
@@ -191,12 +221,13 @@ scripts/
   main.py               # CLI + run_pipeline() (the one pipeline every interface reuses)
   mcp_server.py         # MCP server (FastMCP) exposing the engine as tools
   core/                 # adapter-agnostic engine: models, generate, materialize, runner, triage,
-                        #   ledger, tuning, context, fixtures, registry, discover, promote
+                        #   ledger, tuning, context, fixtures, registry, discover, promote,
+                        #   cache (P1), errors (P2 exit codes), quality (P5 gate), budget (P4 spend)
   adapters/             # python_pytest · web_playwright  (one file per target type)
   prompts/              # scenario-generation prompts + the pytest Jinja template
 config/                 # ai_test_pilot.toml (defaults) + .env.example
 demo/                   # signup.html · login_app/ (auth) · ws_app/ (websocket) — web adapter targets
-tests/                  # 89 unit tests
+tests/                  # 133 unit tests
 ```
 
 ## Design notes
@@ -218,10 +249,14 @@ correctly-typed, regression-grade tests in each case.
 
 ## Limitations
 
-This is a focused, tested tool that I use on my own pipelines — not production test infrastructure,
-and I'm honest about the edges. The input shapes it deliberately won't guess at, the
-non-determinism of the LLM step, scale/safety boundaries, and the packaging caveats are all written
-up in **[LIMITATIONS.md](LIMITATIONS.md)**. Knowing them is part of using it well.
+The `python_pytest` adapter is a tested, quality-gated, cost-bounded tool I rely on for my own
+pipelines — reproducible (temperature 0 + scenario cache), fail-safe (typed exit-code contract), and
+guarded by a regression gate. Its honest scope is **trusted, single-machine** code: it executes the
+tests it generates and sends introspected source to the configured LLM gateway, so it is not a
+sandbox for untrusted targets. The `web_playwright` adapter remains a **demo** of advanced Playwright
+technique. The input shapes the tool deliberately won't guess at, the non-determinism of the LLM
+step, and the scale/safety/packaging boundaries are all written up in
+**[LIMITATIONS.md](LIMITATIONS.md)** — knowing them is part of using it well.
 
 ## License
 

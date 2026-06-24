@@ -91,7 +91,11 @@ def generate_fixture(
 
     cmd = [py, str(main_py), "--domain", domain, "--n", str(rows), "--no-judge"]
     logger.info("Invoking data-factory: %s (cwd=%s)", " ".join(cmd), factory_root)
-    proc = subprocess.run(cmd, cwd=str(factory_root), capture_output=True, text=True)
+    try:                                               # P6: bound the child (it may call an LLM)
+        proc = subprocess.run(cmd, cwd=str(factory_root), capture_output=True, text=True, timeout=300)
+    except subprocess.TimeoutExpired:
+        logger.warning("Data-factory exceeded 300s; skipping fixtures.")
+        return None
     if proc.returncode != 0:
         logger.warning(
             "Data-factory run failed (exit %d); skipping fixtures.\n%s",

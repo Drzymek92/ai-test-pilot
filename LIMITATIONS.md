@@ -1,8 +1,10 @@
 # Limitations & Boundaries
 
-A deliberately honest map of what AI Test Pilot does **not** do (yet). It's a focused, tested tool
-— not production test infrastructure — and knowing the edges is part of using it well. Each item is
-a real boundary observed in development, not a hypothetical.
+A deliberately honest map of what AI Test Pilot does **not** do. The **`python` adapter** is a tested,
+quality-gated, cost-bounded tool the author relies on for their own pipelines — reliable for
+**trusted code on a single machine**, not infrastructure for arbitrary or untrusted use. The **`web`
+(Playwright) adapter remains a demo.** Knowing the edges is part of using it well; each item below is a
+real boundary observed in development, not a hypothetical.
 
 ## Generation quality (the real frontier)
 
@@ -10,9 +12,11 @@ The tool is validated on a curated set of target shapes (typed business-rules en
 data-transformation helpers, web forms, an authenticated app, a WebSocket feed). Outside that set,
 quality degrades gracefully but is **not** guaranteed. Known out-of-scope input shapes:
 
-- **Constrained / exotic types it won't construct:** pydantic validator-constrained fields,
-  `attrs`/`NamedTuple`, a `Union` of several project types, and alternate constructors. These hit
-  the deterministic **warn-and-skip** guard rather than producing a wrong test.
+- **Constrained / exotic types it won't construct:** params gated by a custom pydantic
+  `@field_validator`, a `Union` of several project types, alternate constructors (classmethods /
+  factory functions), and fixture-injected params. These hit the deterministic **warn-and-skip**
+  guard rather than producing a wrong test. (Declarative pydantic `Field` constraints — `gt`/`le`/
+  `min_length`/`Annotated[...]` — plus `attrs` and `NamedTuple` *are* now constructed.)
 - **Third-party / dynamic parameter types** are not resolved from source — flagged as
   `complex_params` and skipped, not guessed.
 - **Assertion strength:** for computed results the LLM asserts *type + structure*, not exact math,
@@ -23,24 +27,69 @@ quality degrades gracefully but is **not** guaranteed. Known out-of-scope input 
 - **Binary file inputs** (pdf/xlsx/png) need real fixtures; auto-generated `tmp_files` cover text
   formats only (csv/json/txt/md/html).
 
-## Determinism
+## Determinism (P1)
 
-The LLM step (scenario proposal) is **non-deterministic** — the same target can yield different
-scenarios across runs. `--golden` + the run ledger mitigate this (lock values, track the best
-prompt version), but there is no hard reproducibility guarantee on the *set* of scenarios.
+Generation now defaults to **`temperature=0`**, and a **scenario cache/lock** replays the same
+scenarios for an unchanged target: the cache key is the full system+human prompt (which embeds the
+target source, prompt version, and context blocks) plus the **resolved model version**, temperature,
+and scenario count — so a re-run is identical, and any change (including a model upgrade) invalidates
+the entry and regenerates. Use `--no-cache` to always call the LLM, or `--refresh-cache` to
+regenerate and overwrite. `--golden` remains the recommended **regression** mode (locks assertions to
+real computed values). Residual caveat: at `temperature>0` or `--no-cache`, the LLM step is still
+inherently non-deterministic; the lock guarantees replay, not that two *fresh* generations match.
 
-## Scale & cost
+## Robustness & exit codes (P2)
 
-Designed for per-target runs (a handful of flows each). It is **not** a repo-scale batch engine:
-no built-in concurrency, rate-limit backoff, or token-budget guardrails for thousands of targets.
-The `discover --changed` / `--since` incremental path narrows a run to git-changed modules, which
-is the cheap way to stay within bounds — but large sweeps are still your responsibility to budget.
+Built to run non-interactively. The LLM call has a **timeout + exponential-backoff retry** and
+raises on exhaustion rather than emitting a half-generated suite; a **malformed/syntax-error target
+is skipped with a reason**, not a stack trace; and a **per-test time budget** caps the run so a
+hanging generated test can't hang the pipeline (there's no `pytest-timeout` plugin here, so the cap
+is enforced at the subprocess level = per-test budget × scenarios + buffer; it bounds the run rather
+than isolating one test). Documented exit codes: **0** success · **1** internal error · **2** usage
+(bad args) · **3** target error (uninspectable) · **4** LLM error (generation failed after retries) ·
+**5** quality regression (the `quality` gate) · **6** budget exceeded (`on_over=abort`). Tunables in `[generation]` of
+`config/ai_test_pilot.toml` (`llm_timeout`, `llm_retries`, `per_test_timeout`, `cache`).
 
-## Safety
+## Quality gate (P5)
 
-Generated tests are **executed** (in a subprocess) to validate them. Targets are assumed to be
-**trusted** code (your own projects). There is no sandbox — do not point it at untrusted code.
-Introspected source is sent to the configured LLM gateway; mind data-governance for sensitive code.
+`python scripts/main.py quality` runs a small **curated, known-good** target set and reports a panel —
+coverage, pass-rate, **false-positive rate**, error-rate, **test-smell density**, ledger acceptance —
+then exits 5 if any metric regressed vs the stored baseline (`--update-baseline` to set one). Honest
+bounds: the **false-positive rate assumes the target set is genuinely correct** (a failing test on
+known-good code is counted as a false positive); the **smell checks omit "Magic Number"** on purpose
+(exact-value assertions are the goal here, not a smell); coverage is line-coverage via the stdlib
+`trace` module (no branch/mutation coverage — **mutation score is out of scope**, and per the
+Pynguin literature only ~0.45-correlates with line coverage anyway). A missing curated target is
+skipped, not failed.
+
+## Scale & cost (P4)
+
+Every run **measures real token usage** (input/output, recorded to the ledger + report; a P1 cache
+replay spends 0) and can compute a `cost_est` from a configurable price table (`[budget]`). **Budget
+caps are opt-in** (`max_tokens_per_run` / `max_tokens_per_sweep`, `on_over=warn|abort`→exit 6, both 0
+by default so nothing blocks unless you ask): the estimate counts input tokens from the prompt and
+**estimates output from your own ledger history** (avg per scenario), so the cap **bounds surprise but
+is not an exact guarantee** — output length is unknowable a priori. `sweep <project>` "tests the diff"
+(`discover --changed` → generate per module) under the per-sweep cap. Still **not** a high-throughput
+engine: **no concurrency** (sequential calls — deferred to avoid rate-limit risk), so very large sweeps
+are slow even when bounded.
+
+## Safety (P6)
+
+**Trusted code only.** This tool both *introspects* a target (ast-only — it never imports it) and
+**executes code** on its behalf: the generated tests run in a subprocess, and `--golden` runs a probe
+that calls the target's own functions. Point it only at code you trust (your own projects).
+
+**Defense-in-depth, not a sandbox.** Every spawned child is **time-bounded** so a hang can't wedge
+the tool: the test run (per-test budget), the golden probe (60s), the data-factory fixture child
+(300s), the coverage trace (180s), and each git call (30s). This bounds *accidents* (infinite loops,
+hangs) — it is **not** a security sandbox: there is no memory/CPU/filesystem isolation (OS-level
+resource caps are Unix-only and intentionally out of scope here). Do not run it on hostile code.
+
+**Data governance.** Introspected source — including the **bounded CUT source slice** (P3a) and any
+`agent/project.md`/README context — is sent to the configured LLM gateway for scenario generation.
+For sensitive code, mind what leaves the machine; `--no-cut-source` / `--no-context` reduce what is
+sent.
 
 ## Packaging & install
 
@@ -52,5 +101,9 @@ install; a true PyPI distribution would rename it to `ai_test_pilot`. The web ad
 
 ## Scope
 
-This is a build-to-learn / portfolio tool that I use on my own pipelines — honest framing, not
-production infrastructure. See the README "How it works" section for what it *does* do well.
+The **`python` adapter** has crossed from demo to a tool I trust on my own pipelines day-to-day:
+reproducible (P1), fail-safe with a CI-grade exit contract (P2), source-grounded + typed-input aware
+assertions (P3a/P3b), a quality-regression gate (P5), measured spend with opt-in caps (P4), and a
+documented safety boundary (P6). That is the honest claim — **reliable for trusted code on one
+machine**, not hardened multi-tenant infrastructure. The **`web` (Playwright) adapter stays a demo.**
+See the README "How it works" for what it does well.

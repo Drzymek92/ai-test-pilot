@@ -42,11 +42,12 @@ Hard rules:
   and leave "expect_error" null.
 - For an error case: set "expect_error" to the exact exception type name and set
   "assertion" to null. The call is expected to raise.
-- **Reason about behaviour from the ACTUAL code/docstring, not the function name.** If a
-  function has no docstring (the contract says "docstring: NONE"), DO NOT assert exact
-  computed values you cannot derive with certainty — assert invariants instead (type,
-  length, membership, idempotence) and add the "uncertain" tag. A wrong exact assertion
-  is worse than a weaker correct one.
+- **Reason about behaviour from the ACTUAL code/docstring, not the function name.** When the
+  contract includes a `source:` block for a unit, trace what it actually computes and assert the
+  SPECIFIC result for your chosen inputs (exact value/structure), not just its type. If the source
+  is absent/truncated or the result still can't be derived with certainty, DO NOT guess exact
+  values — assert invariants instead (type, length, membership, idempotence) and add the
+  "uncertain" tag. A wrong exact assertion is worse than a weaker correct one.
 - **Never reference a file path that does not exist.** For a function marked IMPURE that
   takes a file path, create the input with "tmp_files": each entry writes `text` to a real
   temp file named `filename` (give it the correct extension — dispatchers switch on suffix)

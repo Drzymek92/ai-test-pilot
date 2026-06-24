@@ -10,12 +10,18 @@ prompt_version = "v1"            # pin a version, or "auto" = deterministic ledg
 output_dir     = "scripts/outputs"
 
 [generation]
-temperature       = 0.2
+temperature       = 0.0          # P1: deterministic by default; raise only to diversify scenarios
 compress_prompt   = false        # route long introspection prompts via prompt_compressor (M2+)
 repair_retries    = 1            # re-ask once on schema-invalid JSON
 use_context       = true         # auto-detect agent/project.md|README near the target for value semantics
 context_max_chars = 2000         # bound the injected domain-context excerpt (token budget)
+cut_source           = true      # P3a: feed the unit's own source (CUT context) so assertions target real computed behaviour (--no-cut-source to disable)
+cut_source_max_chars = 1200      # per-unit source display cap (token budget)
 golden            = false        # characterization mode: run each call once + lock asserts to the captured result (opt-in)
+cache             = true         # P1: replay scenarios for an unchanged target+prompt+model+temp (--no-cache / --refresh-cache)
+llm_timeout       = 60.0         # P2: seconds per LLM request before retry
+llm_retries       = 2            # P2: transient-failure retries after the first attempt (exponential backoff)
+per_test_timeout  = 15.0         # P2: per-test budget; bounds the run so a hanging test can't hang the pipeline (0 = off)
 
 # ── data-factory fixture provider (integration feature) ──────────────────────
 # When enabled, data-processing targets get realistic synthetic inputs from
@@ -47,3 +53,15 @@ fewshot_max_chars      = 1500        # token-budget bound on the exemplar block
 [ledger]
 backend = "duckdb"
 path    = "scripts/outputs/runs.duckdb"
+
+# ── P4: cost/scale guardrails ─────────────────────────────────────────────────
+# Spend is always measured + recorded (tokens in/out, cost_est). Caps are opt-in: 0 = no cap,
+# and on_over defaults to "warn" so a cap never blocks unless you set it. Set a price to get a
+# non-zero cost_est in reports.
+[budget]
+max_tokens_per_run    = 0        # estimate over this many tokens triggers on_over (0 = no cap)
+max_tokens_per_sweep  = 0        # cap across a `sweep` run (0 = no cap)
+on_over               = "warn"   # warn | abort (abort = exit 6, never overspend)
+price_per_mtok_in     = 0.0      # USD / 1M input tokens (fill from your LLM gateway pricing for cost_est)
+price_per_mtok_out    = 0.0      # USD / 1M output tokens
+default_out_per_scenario = 200   # output-token estimate per scenario before any ledger history exists

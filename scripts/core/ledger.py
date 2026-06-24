@@ -138,3 +138,22 @@ def target_acceptance(adapter: str, target: str, path: str | Path) -> tuple[floa
         return float(row[0]), int(row[1])
     finally:
         con.close()
+
+
+def avg_tokens_per_scenario(adapter: str, path: str | Path) -> float | None:
+    """Avg output tokens per generated scenario for an adapter (P4 budget estimation), or None.
+
+    Uses only rows that actually recorded usage (tokens_out > 0, generated > 0)."""
+    p = Path(path)
+    if not p.is_file():
+        return None
+    con = _connect(path)
+    try:
+        row = con.execute(
+            "SELECT AVG(CAST(tokens_out AS DOUBLE) / generated) FROM runs "
+            "WHERE adapter = ? AND tokens_out > 0 AND generated > 0",
+            [adapter],
+        ).fetchone()
+        return float(row[0]) if row and row[0] is not None else None
+    finally:
+        con.close()

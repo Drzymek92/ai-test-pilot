@@ -157,6 +157,20 @@ def _unresolved_idents(annotation: str, known: dict) -> bool:
     return any(i not in known for i in _type_identifiers(annotation))
 
 
+# Hard safety bound on stored unit source (the prompt-time display cap is smaller + configurable).
+_SOURCE_HARD_CAP = 6000
+
+
+def _unit_source(src: str, fn: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
+    """The unit's own source (CUT context, P3a) — bounded so a giant function can't blow the prompt."""
+    seg = ast.get_source_segment(src, fn)
+    if not seg:
+        return None
+    if len(seg) > _SOURCE_HARD_CAP:
+        seg = seg[:_SOURCE_HARD_CAP].rsplit("\n", 1)[0] + "\n# ...(source truncated)"
+    return seg
+
+
 def _unit_from_fn(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> UnitSpec:
     sig, params = _render_signature(fn)
     return UnitSpec(
@@ -214,6 +228,14 @@ def _name_of(node: ast.expr) -> str:
     return ids[-1] if ids else ""
 
 
+# attrs decorators, by their unparsed callee — both the modern (`@define`/`@frozen`/`@mutable`)
+# and classic (`@attr.s`/`@attrs.define`/...) spellings.
+_ATTRS_DECOS = {
+    "define", "frozen", "mutable", "attrs", "attr.s", "attr.attrs", "attr.define",
+    "attr.frozen", "attr.mutable", "attrs.define", "attrs.frozen", "attrs.mutable",
+}
+
+
 def _classify(cls: ast.ClassDef) -> str | None:
     base_ids = {_name_of(b) for b in cls.bases}
     if base_ids & {"Enum", "IntEnum", "StrEnum", "Flag", "IntFlag"}:
@@ -223,20 +245,65 @@ def _classify(cls: ast.ClassDef) -> str | None:
     deco_ids = {_name_of(d.func if isinstance(d, ast.Call) else d) for d in cls.decorator_list}
     if "dataclass" in deco_ids:
         return "dataclass"
+    deco_strs = {ast.unparse(d.func if isinstance(d, ast.Call) else d) for d in cls.decorator_list}
+    if deco_strs & _ATTRS_DECOS:
+        return "attrs"
+    if "NamedTuple" in base_ids:                  # class-form typing.NamedTuple (functional form is skipped)
+        return "namedtuple"
     return None
+
+
+# Field-spec calls whose presence on the RHS means "this is a declared field, not a class var",
+# and whose default/factory kwargs decide whether the field is required.
+_FIELD_CALLS = {"Field", "field", "ib", "attr.ib", "attrib", "attr.field"}
+# Constraint kwargs the LLM should respect when choosing a value (pydantic Field / con* types).
+_CONSTRAINT_KW = ("gt", "ge", "lt", "le", "multiple_of",
+                  "min_length", "max_length", "pattern", "max_digits", "decimal_places")
+
+
+def _is_field_call(value: ast.expr | None) -> bool:
+    return isinstance(value, ast.Call) and _name_of(value.func) in {c.split(".")[-1] for c in _FIELD_CALLS}
 
 
 def _field_has_default(value: ast.expr | None) -> bool:
     if value is None:
         return False
-    if isinstance(value, ast.Call) and _name_of(value.func) == "Field":
-        if any(kw.arg in ("default", "default_factory") for kw in value.keywords):
+    if _is_field_call(value):
+        if any(kw.arg in ("default", "default_factory", "factory") for kw in value.keywords):
             return True
-        # Field(...) with Ellipsis (or no positional) means required.
+        # Field(...)/field()/attr.ib() with Ellipsis or no positional default means required.
         return bool(value.args) and not (
             isinstance(value.args[0], ast.Constant) and value.args[0].value is Ellipsis
         )
     return True
+
+
+def _constraints_from_call(call: ast.Call) -> str | None:
+    """Collect value constraints from a Field(...)/conint(...)/constr(...) call → 'gt=0, le=100'."""
+    parts = [f"{kw.arg}={ast.unparse(kw.value)}" for kw in call.keywords
+             if kw.arg in _CONSTRAINT_KW]
+    return ", ".join(parts) if parts else None
+
+
+def _field_constraint(node: ast.AnnAssign) -> str | None:
+    """Constraints from the RHS Field(...) or from a con*()/Annotated[...] annotation (P3b-2)."""
+    if isinstance(node.value, ast.Call) and _name_of(node.value.func) in {"Field", "field"}:
+        c = _constraints_from_call(node.value)
+        if c:
+            return c
+    # conint(gt=0) / constr(min_length=1) / confloat(...) / condecimal(...) as the annotation
+    ann = node.annotation
+    if isinstance(ann, ast.Call) and _name_of(ann.func).startswith("con"):
+        return _constraints_from_call(ann)
+    # Annotated[int, Field(gt=0)] — scan the metadata args for a Field/con* call
+    if isinstance(ann, ast.Subscript) and _name_of(ann.value) == "Annotated":
+        elts = ann.slice.elts if isinstance(ann.slice, ast.Tuple) else []
+        for meta in elts:
+            if isinstance(meta, ast.Call):
+                c = _constraints_from_call(meta)
+                if c:
+                    return c
+    return None
 
 
 def _extract_fields(cls: ast.ClassDef) -> list[FieldSpec]:
@@ -250,7 +317,17 @@ def _extract_fields(cls: ast.ClassDef) -> list[FieldSpec]:
             if ann.startswith("ClassVar"):
                 continue
             fields.append(FieldSpec(name=n, annotation=ann or None,
-                                    has_default=_field_has_default(node.value)))
+                                    has_default=_field_has_default(node.value),
+                                    constraint=_field_constraint(node)))
+        # old-style attrs: `x = attr.ib(...)` / `x = field(...)` (no annotation)
+        elif isinstance(node, ast.Assign) and _is_field_call(node.value) \
+                and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            n = node.targets[0].id
+            if n.startswith("_"):
+                continue
+            fields.append(FieldSpec(name=n, annotation=None,
+                                    has_default=_field_has_default(node.value),
+                                    constraint=_constraints_from_call(node.value)))
     return fields
 
 
@@ -310,7 +387,8 @@ def introspect(ref: TargetRef) -> TargetContract:
     path = Path(ref.locator)
     if not path.is_file():
         raise FileNotFoundError(f"Target module not found: {path}")
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    src = path.read_text(encoding="utf-8")
+    tree = ast.parse(src, filename=str(path))
     wanted = {s.strip() for s in ref.selector.split(",")} if ref.selector else None
 
     units: list[UnitSpec] = []
@@ -318,7 +396,9 @@ def introspect(ref: TargetRef) -> TargetContract:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if wanted is not None and node.name not in wanted:
                 continue
-            units.append(_unit_from_fn(node))
+            u = _unit_from_fn(node)
+            u.source = _unit_source(src, node)   # P3a: CUT context for specific-behaviour assertions
+            units.append(u)
 
     if not units:
         scope = f" matching {sorted(wanted)}" if wanted else ""

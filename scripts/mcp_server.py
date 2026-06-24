@@ -81,6 +81,7 @@ def generate_tests(target: str, adapter: str = "", selector: str = "", count: in
             count=count or None, model=None, prompt_version=None, no_run=False,
             fixtures=fixtures, fixture_domain=fixture_domain or None, fixture_entity=None,
             fixture_rows=None, context=None, no_context=no_context, golden=golden,
+            no_cache=False, refresh_cache=False, no_cut_source=False,
         )
         r = run_pipeline(cfg, args)
         lines = [

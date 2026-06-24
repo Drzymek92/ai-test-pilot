@@ -40,6 +40,7 @@ class UnitSpec(BaseModel):
     is_pure: bool = True              # heuristic: no obvious IO/side effects → safe to call directly
     reads_clock: bool = False         # body reads the wall clock/RNG → non-deterministic unless time is pinned
     complex_params: list[str] = Field(default_factory=list)   # params typed as non-constructible domain objects ("name: Type")
+    source: str | None = None         # P3a: bounded slice of the unit's own source → specific-behaviour assertions (CUT context)
     elements: list[dict] = Field(default_factory=list)        # web route only: interactive DOM elements {tag, selector, text, attrs}
 
 
@@ -48,6 +49,7 @@ class FieldSpec(BaseModel):
     name: str
     annotation: str | None = None
     has_default: bool = False         # omit from a constructor call to accept the default
+    constraint: str | None = None     # P3b-2: value constraints to respect, e.g. "gt=0, le=100" (pydantic Field/con*)
 
 
 class TypeSpec(BaseModel):
@@ -57,7 +59,7 @@ class TypeSpec(BaseModel):
     Lets the LLM describe how to BUILD a typed param instead of fabricating a dict.
     """
     name: str
-    kind: Literal["dataclass", "pydantic", "enum"]
+    kind: Literal["dataclass", "pydantic", "enum", "attrs", "namedtuple"]
     module: str                       # importable module the type lives in
     fields: list[FieldSpec] = Field(default_factory=list)   # dataclass/pydantic
     enum_members: list[str] = Field(default_factory=list)   # enum only (member names)
@@ -164,6 +166,9 @@ class RunReport(BaseModel):
     fixture_file: str | None = None
     context_file: str | None = None
     caveats: list[str] = Field(default_factory=list)   # tool-support warnings for this target
+    tokens_in: int = 0                 # P4: real generation spend this run (0 on a cache replay)
+    tokens_out: int = 0
+    cost_est: float = 0.0
 
 
 class RunRecord(BaseModel):
