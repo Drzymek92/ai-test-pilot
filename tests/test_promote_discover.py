@@ -112,3 +112,51 @@ def test_discover_skips_plumbing_and_empty_modules(tmp_path):
     (scripts / "logger.py").write_text("def get_logger():\n    return None\n", encoding="utf-8")
     (scripts / "constants.py").write_text("X = 1\n", encoding="utf-8")  # no functions
     assert discover.discover(proj, python_pytest) == []
+
+
+# ── discover: incremental (git-changed) scan ──────────────────────────────────
+def test_discover_only_filter_restricts_to_given_modules(tmp_path):
+    proj = tmp_path / "proj"
+    scripts = proj / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "a.py").write_text("def fa(x: int) -> int:\n    return x\n", encoding="utf-8")
+    (scripts / "b.py").write_text("def fb(x: int) -> int:\n    return x\n", encoding="utf-8")
+
+    only = {(scripts / "a.py").resolve()}
+    reports = discover.discover(proj, python_pytest, only=only)
+    assert [r.rel for r in reports] == ["scripts/a.py"]
+
+
+def test_git_changed_py_none_outside_repo(tmp_path):
+    assert discover.git_changed_py(tmp_path) is None
+
+
+def test_git_changed_py_lists_modified_and_untracked(tmp_path):
+    import shutil
+    import subprocess
+
+    if shutil.which("git") is None:
+        import pytest
+        pytest.skip("git not available")
+
+    proj = tmp_path / "repo"
+    scripts = proj / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "tracked.py").write_text("def f(): return 1\n", encoding="utf-8")
+
+    def git(*args):
+        subprocess.run(["git", "-C", str(proj), *args], check=True,
+                       capture_output=True, text=True)
+
+    git("init", "-q")
+    git("config", "user.email", "t@t.t")
+    git("config", "user.name", "t")
+    git("add", "-A")
+    git("commit", "-qm", "baseline")
+
+    # modify a tracked file + add a brand-new untracked one
+    (scripts / "tracked.py").write_text("def f(): return 2\n", encoding="utf-8")
+    (scripts / "fresh.py").write_text("def g(): return 3\n", encoding="utf-8")
+
+    changed = discover.git_changed_py(proj)
+    assert changed == {(scripts / "tracked.py").resolve(), (scripts / "fresh.py").resolve()}

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-test-pilot"
+version = "0.1.0"
+description = "LLM-driven test generator: introspect a target, propose schema-validated JSON scenarios, render runnable tests deterministically, run them, and triage the failures."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Drzymek92" }]
+keywords = ["testing", "llm", "pytest", "playwright", "mcp", "test-generation"]
+# Single source of truth for runtime pins is config/requirements.txt — read dynamically
+# below so the two never drift.
+dynamic = ["dependencies"]
+
+[project.scripts]
+ai-test-pilot = "scripts.main:main"
+
+[project.urls]
+Homepage = "https://github.com/Drzymek92/ai-test-pilot"
+Repository = "https://github.com/Drzymek92/ai-test-pilot"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["config/requirements.txt"] }
+
+[tool.setuptools]
+# NOTE: the import package is `scripts` (kept to avoid churning every internal `from scripts...`
+# import + the sys.path bootstrap). Fine for an editable/personal install (`pip install -e .`);
+# a true PyPI release would rename it to `ai_test_pilot` — see LIMITATIONS.md.
+packages = ["scripts", "scripts.core", "scripts.adapters"]
+
+[tool.setuptools.package-data]
+scripts = ["prompts/*.md", "prompts/templates/*.j2"]

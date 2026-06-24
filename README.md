@@ -6,7 +6,7 @@
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Tests](https://img.shields.io/badge/tests-89%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-92%20passing-brightgreen)
 [![CI](https://github.com/Drzymek92/ai-test-pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/Drzymek92/ai-test-pilot/actions/workflows/ci.yml)
 
 ## Overview
@@ -145,11 +145,15 @@ git clone https://github.com/Drzymek92/ai-test-pilot.git
 cd ai-test-pilot
 python -m venv .venv
 .venv\Scripts\activate          # Windows  (source .venv/bin/activate on macOS/Linux)
-pip install -r requirements.txt
+pip install -e .                # installs deps + the `ai-test-pilot` command
+#   (or `pip install -r requirements.txt` for deps only, without the console entry point)
 cp config/.env.example config/.env     # then fill in your LLM gateway values
 # for the web adapter only:
 python -m playwright install chromium
 ```
+
+Installed this way you can call it as `ai-test-pilot ...` anywhere; the examples below use
+`python scripts/main.py ...`, which is equivalent.
 
 ### Usage
 ```bash
@@ -167,6 +171,10 @@ python scripts/main.py accept <run_id> --kept 4
 
 # scan a project for testable targets (deterministic, no LLM)
 python scripts/main.py discover path/to/project
+
+# incremental: only the modules changed in git (regenerate tests for what moved, not the whole tree)
+python scripts/main.py discover path/to/project --changed          # working tree vs HEAD
+python scripts/main.py discover path/to/project --since main        # vs a ref / tag / commit
 
 # clean a draft for the suite: strip boilerplate, rewrite golden locks, append non-duplicates
 python scripts/main.py promote <run_id> --into tests/test_module.py
@@ -207,6 +215,13 @@ correctly-typed, regression-grade tests in each case.
 > **CI note:** the published CI runs the full unit suite, which is browser-free by design — the
 > `web_playwright` tests assert on the *generated test source*, not a live browser. The `--serve`
 > demos are run locally (after `playwright install chromium`); CI doesn't download a browser.
+
+## Limitations
+
+This is a focused, tested tool that I use on my own pipelines — not production test infrastructure,
+and I'm honest about the edges. The input shapes it deliberately won't guess at, the
+non-determinism of the LLM step, scale/safety boundaries, and the packaging caveats are all written
+up in **[LIMITATIONS.md](LIMITATIONS.md)**. Knowing them is part of using it well.
 
 ## License
 

@@ -1,0 +1,20 @@
+{# One pytest function per scenario. The file header (imports + sys.path bootstrap) is
+   rendered by core/materialize.py; the docstring, setup, and call are built in the
+   adapter (`doc`, `setup`, `call`, `func_args`). Filters: slug, pyrepr. #}
+
+def test_{{ s.id|slug }}({{ func_args }}):
+{{ doc }}
+{% if setup %}
+{{ setup }}
+{% endif %}
+{% if s.expect_error %}
+    with pytest.raises({{ s.expect_error }}):
+        {{ call }}
+{% else %}
+    result = {{ call }}
+{% if s.assertion %}
+    assert {{ s.assertion }}, {{ s.expected|pyrepr }}
+{% else %}
+    pytest.skip("ai-test-pilot: scenario lacked a concrete assertion — review manually")
+{% endif %}
+{% endif %}
