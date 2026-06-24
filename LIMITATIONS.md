@@ -86,10 +86,26 @@ the tool: the test run (per-test budget), the golden probe (60s), the data-facto
 hangs) — it is **not** a security sandbox: there is no memory/CPU/filesystem isolation (OS-level
 resource caps are Unix-only and intentionally out of scope here). Do not run it on hostile code.
 
+**The model authors JSON, never code.** Generated tests are rendered deterministically from the
+schema-validated scenario; the model never writes a code line. The value grammar
+(`$type`/`$call`/`$enum` and constructor argument names) is **allow-listed against the types the tool
+resolved from the target's own source — at both generation time and render time**. An unknown symbol
+or a non-identifier arg name is rejected (routed through the repair retry), so a crafted
+docstring/source string — which *is* fed to the prompt by default (`cut_source`) and whose output is
+*executed* by pytest and the golden probe — cannot smuggle code tokens into the materialized test.
+
 **Data governance.** Introspected source — including the **bounded CUT source slice** (P3a) and any
 `agent/project.md`/README context — is sent to the configured LLM gateway for scenario generation.
 For sensitive code, mind what leaves the machine; `--no-cut-source` / `--no-context` reduce what is
 sent.
+
+## Failure triage
+
+When a generated test fails, `triage` classifies it deterministically (real_bug / bad_scenario /
+flaky / env_issue) and only calls the LLM for genuinely ambiguous cases. **When the LLM is
+unavailable, an ambiguous failure defaults to `bad_scenario` at low confidence (0.3).** For a *test
+generator* that is the self-flattering direction — it can mask a real bug in the target — so treat a
+low-confidence `bad_scenario` verdict as "a human should look", not "the code is fine".
 
 ## Packaging & install
 
@@ -98,6 +114,11 @@ sent.
 install; a true PyPI distribution would rename it to `ai_test_pilot`. The web adapter's browser
 (`python -m playwright install chromium`) is a separate, manual step; CI is browser-free by design
 (web tests assert on the *generated source*, not a live browser).
+
+**Raw drafts embed an absolute path.** A generated draft in `outputs/` bootstraps its imports with
+`sys.path.insert(0, '<absolute target-project path>')`, so a raw draft only runs on the machine that
+generated it and would leak that local path if shared verbatim. `promote` strips this bootstrap when
+moving a test into a real suite — promote (don't copy a raw draft) before sharing.
 
 ## Scope
 

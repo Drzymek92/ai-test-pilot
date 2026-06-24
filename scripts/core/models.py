@@ -1,4 +1,4 @@
-"""Pydantic data contracts — the schema spine (ARCHITECTURE.md §4).
+"""Pydantic data contracts — the schema spine.
 
 Every stage consumes and produces typed objects, not free text. The LLM's output
 is validated against TestScenario/ScenarioSet (reject + one repair retry on invalid

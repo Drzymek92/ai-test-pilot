@@ -48,12 +48,15 @@ _SCALAR_IMPORTS = {
     "UUID": "uuid",
 }
 
-# Names whose appearance in a function body suggests IO / side effects → not "pure".
-_IMPURE_HINTS = (
+# Call/attribute identifiers that mean IO / side effects → not "pure". Matched as exact AST
+# node names (a called function, or an attribute/method name), NOT substrings — so `reopen`
+# / `is_open` / `overwrite` no longer false-match `open` / `write`.
+_IMPURE_NAMES = frozenset({
     "open", "read_text", "read_bytes", "write_text", "write_bytes", "write",
-    "save", "load_workbook", "connect", "request", "Document", "fitz", "docx",
-    "print", "input", "os.", "subprocess", "requests", "urllib",
-)
+    "save", "load_workbook", "connect", "request", "Document", "print", "input",
+})
+# Modules whose use (any `<module>.x` access, or a bare reference) means IO / side effects.
+_IMPURE_MODULES = frozenset({"os", "subprocess", "requests", "urllib", "fitz", "docx"})
 
 
 # ── import resolution ────────────────────────────────────────────────────────
@@ -126,19 +129,47 @@ def _raises(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
     return out
 
 
+def _attr_root(node: ast.expr) -> str | None:
+    """Leftmost Name id of an attribute chain ('urllib.request.urlopen' → 'urllib')."""
+    while isinstance(node, ast.Attribute):
+        node = node.value
+    return node.id if isinstance(node, ast.Name) else None
+
+
 def _is_pure(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
-    body_src = ast.unparse(fn)
-    return not any(hint in body_src for hint in _IMPURE_HINTS)
+    """True if the body shows no IO / side-effect call, method, or impure-module use.
+
+    AST node-name detection (not substring): a called function or attribute whose exact
+    name is impure, or any access on an impure module. Precise where the old substring
+    scan over-matched (`reopen`/`is_open`/`overwrite`) and under-matched aliased IO.
+    """
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Call) and _name_of(node.func) in _IMPURE_NAMES:
+            return False
+        if isinstance(node, ast.Attribute):
+            if node.attr in _IMPURE_NAMES or _attr_root(node) in _IMPURE_MODULES:
+                return False
+        if isinstance(node, ast.Name) and node.id in _IMPURE_MODULES:
+            return False
+    return True
 
 
-# Tokens whose presence means the function reads the wall clock / RNG → its result is not
-# reproducible unless the relevant time is pinned via a parameter.
-_CLOCK_HINTS = ("now(", "today(", "utcnow(", "time.time(", "monotonic(", "perf_counter(",
-                "random", "uuid4(", "uuid1(", "gmtime(", "localtime(")
+# Call names (function/method) and modules whose use means the function reads the wall clock /
+# RNG → its result is not reproducible unless the relevant time is pinned via a parameter.
+_CLOCK_CALL_NAMES = frozenset({"now", "today", "utcnow", "monotonic", "perf_counter",
+                               "uuid4", "uuid1", "gmtime", "localtime"})
+_CLOCK_MODULES = frozenset({"time", "random"})
 
 
 def _reads_clock(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
-    return any(tok in ast.unparse(fn) for tok in _CLOCK_HINTS)
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Call) and _name_of(node.func) in _CLOCK_CALL_NAMES:
+            return True
+        if isinstance(node, ast.Attribute) and _attr_root(node) in _CLOCK_MODULES:
+            return True
+        if isinstance(node, ast.Name) and node.id in _CLOCK_MODULES:
+            return True
+    return False
 
 
 def _constructible(annotation: str) -> bool:
@@ -532,6 +563,76 @@ def _render_value(node) -> str:
     return repr(node)
 
 
+# ── value-grammar allow-list (security: the model authors JSON, never code tokens) ──
+def _check_value(node, *, types: set[str], enums: dict[str, list[str]]) -> None:
+    """Reject any value-grammar node that would render a symbol/name the tool did not
+    itself resolve. Every `$type`/`$call`/`$enum` and every kwarg name is interpolated
+    raw into a code position by `_render_value`, so this is the guard that keeps the
+    'every line rendered deterministically, never written by the model' invariant true.
+    Raises ValueError (routed through generate()'s repair-retry; also a render-time
+    safety net in emit/probe_source). Primitives are repr()'d and need no check.
+    """
+    if isinstance(node, dict):
+        if "$type" in node:
+            t = node["$type"]
+            if not isinstance(t, str) or t not in types:
+                raise ValueError(
+                    f"value grammar: $type {t!r} is not a resolved constructible type "
+                    f"(known: {sorted(types)})")
+            args = node.get("args") or {}
+            if not isinstance(args, dict):
+                raise ValueError(f"value grammar: $type {t!r} 'args' must be a name->value object")
+            for k, v in args.items():
+                if not (isinstance(k, str) and k.isidentifier()):
+                    raise ValueError(f"value grammar: invalid argument name {k!r} for $type {t!r}")
+                _check_value(v, types=types, enums=enums)
+            return
+        if "$call" in node:
+            f = node["$call"]
+            if not isinstance(f, str) or f not in _SCALAR_IMPORTS:
+                raise ValueError(
+                    f"value grammar: $call {f!r} is not an allowed scalar constructor "
+                    f"(known: {sorted(_SCALAR_IMPORTS)})")
+            args = node.get("args") or []
+            if isinstance(args, dict):
+                for k, v in args.items():
+                    if not (isinstance(k, str) and k.isidentifier()):
+                        raise ValueError(f"value grammar: invalid argument name {k!r} for $call {f!r}")
+                    _check_value(v, types=types, enums=enums)
+            else:
+                for v in args:
+                    _check_value(v, types=types, enums=enums)
+            return
+        if "$enum" in node:
+            ref = node["$enum"]
+            if not isinstance(ref, str) or "." not in ref:
+                raise ValueError(f"value grammar: $enum {ref!r} must be 'EnumName.MEMBER'")
+            base, _, member = ref.partition(".")
+            if base not in enums:
+                raise ValueError(
+                    f"value grammar: $enum {ref!r} names unknown enum {base!r} "
+                    f"(known: {sorted(enums)})")
+            members = enums[base]
+            if members and member not in members:
+                raise ValueError(
+                    f"value grammar: $enum {ref!r} member not in {base} (members: {members})")
+            return
+        for v in node.values():                          # plain dict literal — repr'd keys, recurse values
+            _check_value(v, types=types, enums=enums)
+    elif isinstance(node, list):
+        for v in node:
+            _check_value(v, types=types, enums=enums)
+
+
+def validate_scenario(scenario: TestScenario, contract: TargetContract) -> None:
+    """Allow-list every value-grammar symbol in a scenario's inputs against the types the
+    tool resolved from the target's own source. Raises ValueError on any unknown symbol."""
+    types = set(contract.types)
+    enums = {n: t.enum_members for n, t in contract.types.items() if t.kind == "enum"}
+    for v in scenario.inputs.values():
+        _check_value(v, types=types, enums=enums)
+
+
 def _collect_symbols(node, types_used: set, calls_used: set, enums_used: set) -> None:
     """Walk a value tree collecting symbols that need importing."""
     if isinstance(node, dict):
@@ -573,6 +674,7 @@ def _render_call(scenario: TestScenario) -> str:
 
 def emit(scenario: TestScenario, contract: TargetContract) -> str:
     """Render ONE scenario to a pytest function body (no file header)."""
+    validate_scenario(scenario, contract)        # safety net: never render an un-allow-listed symbol
     env = _jinja_env()
     template = env.get_template("pytest_function_v1.j2")
     func_args = "tmp_path" if scenario.tmp_files else ""
@@ -592,6 +694,8 @@ def probe_source(contract: TargetContract, scenarios: list[TestScenario]) -> str
     Used by golden/characterization mode to capture the ACTUAL result of a call so the test can
     lock it in. Only for scenarios with no tmp_files and no expected error (plain in-memory calls).
     """
+    for s in scenarios:                              # safety net before any code is emitted/executed
+        validate_scenario(s, contract)
     lines = [file_header(contract, scenarios), "import json as _aitp_json", ""]
     for s in scenarios:
         call = _render_call(s)

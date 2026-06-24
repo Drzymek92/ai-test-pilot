@@ -6,7 +6,7 @@
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Tests](https://img.shields.io/badge/tests-133%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-145%20passing-brightgreen)
 [![CI](https://github.com/Drzymek92/ai-test-pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/Drzymek92/ai-test-pilot/actions/workflows/ci.yml)
 
 ## Overview
@@ -30,6 +30,9 @@ target is a single new file with zero changes to the core:
 
 - **Structured-output pipeline** — the LLM returns JSON validated against a Pydantic schema (with a
   one-shot repair retry); code is generated from the validated objects, never written by the model.
+  The value grammar's `$type`/`$call`/`$enum` symbols (and constructor argument names) are
+  **allow-listed against the types resolved from the target's own source**, so a crafted
+  docstring/source can't smuggle code tokens into a generated test that then gets executed.
 - **Typed-input construction** — recursively resolves a function's parameter *types* from source
   (dataclass + Pydantic + `attrs` + `NamedTuple`, nested, `Decimal`/`datetime`/`Enum`, defaults) via
   `ast` — **without importing the target** — and builds real constructor calls. It even surfaces
@@ -227,7 +230,7 @@ scripts/
   prompts/              # scenario-generation prompts + the pytest Jinja template
 config/                 # ai_test_pilot.toml (defaults) + .env.example
 demo/                   # signup.html · login_app/ (auth) · ws_app/ (websocket) — web adapter targets
-tests/                  # 133 unit tests
+tests/                  # 145 unit tests
 ```
 
 ## Design notes

@@ -1,4 +1,4 @@
-"""Adapter contract (ARCHITECTURE.md §8).
+"""Adapter contract.
 
 An adapter is a stateless module registered by name. The core never imports an
 adapter directly — only through registry.py. Adding a target type = one new module

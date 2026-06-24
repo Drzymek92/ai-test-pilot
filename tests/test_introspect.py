@@ -1,10 +1,15 @@
 """Deterministic introspection + emission tests (no LLM)."""
+import ast
 from pathlib import Path
 
 import pytest
 
 from scripts.adapters import python_pytest as adapter
 from scripts.core.models import TargetContract, TargetRef, TestScenario, TmpFile, UnitSpec
+
+
+def _fn(src: str) -> ast.FunctionDef:
+    return ast.parse(src).body[0]
 
 
 def _contract(sample_module: Path, selector: str | None = None) -> TargetContract:
@@ -30,6 +35,31 @@ def test_introspect_detects_raises_and_purity(sample_module):
     assert "ValueError" in by_name["needs_positive"].raises
     assert by_name["add"].is_pure is True
     assert by_name["reads_a_file"].is_pure is False    # open() → impure
+
+
+# ── purity / clock detection is AST-precise, not substring (review finding #3) ──
+def test_is_pure_no_false_positive_on_substrings():
+    # `reopen`/`is_open`/`overwrite`/`randomize` must NOT match `open`/`write`/`random`
+    assert adapter._is_pure(_fn("def f(reopen, overwrite):\n    return reopen + overwrite\n"))
+    assert adapter._is_pure(_fn("def is_open(x):\n    return x.startswith('o')\n"))
+    assert adapter._reads_clock(_fn("def f(randomize):\n    return randomize * 2\n")) is False
+
+
+def test_is_pure_detects_real_and_aliased_io():
+    assert adapter._is_pure(_fn("def f(p):\n    return open(p).read()\n")) is False
+    assert adapter._is_pure(_fn("def f(p):\n    return p.read_text()\n")) is False
+    assert adapter._is_pure(_fn("def f():\n    return os.getcwd()\n")) is False        # module use
+    assert adapter._is_pure(_fn("def f():\n    return subprocess.run(['ls'])\n")) is False
+
+
+def test_reads_clock_detects_aliased_time_and_rng():
+    assert adapter._reads_clock(_fn("def f():\n    return datetime.now()\n"))
+    assert adapter._reads_clock(_fn("def f():\n    return time.monotonic()\n"))
+    assert adapter._reads_clock(_fn("def f():\n    return random.random()\n"))
+    assert adapter._reads_clock(_fn("def f():\n    return uuid4()\n"))
+    # a pure path/string function is neither impure nor clock-reading
+    assert adapter._reads_clock(_fn("def f(p):\n    return Path(p).name\n")) is False
+    assert adapter._is_pure(_fn("def f(p):\n    return Path(p).name\n"))
 
 
 def test_introspect_selector_filters(sample_module):

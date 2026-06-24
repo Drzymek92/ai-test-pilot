@@ -2,8 +2,8 @@
 
 Deterministic scaffolding around a single LLM call: build a prompt from the
 introspection contract, call the gateway, then parse + validate the response into a
-schema-checked ScenarioSet. Invalid JSON or schema violations trigger one repair retry
-(ARCHITECTURE.md §2/§4). The LLM only ever returns JSON — code is rendered later.
+schema-checked ScenarioSet. Invalid JSON or schema violations trigger one repair retry.
+The LLM only ever returns JSON — code is rendered later.
 """
 from __future__ import annotations
 
@@ -110,9 +110,13 @@ def _valid_units(contract: TargetContract) -> set[str]:
     return {u.name for u in contract.units}
 
 
-def _parse_scenarios(raw: str, contract: TargetContract) -> list[TestScenario]:
+def _parse_scenarios(raw: str, contract: TargetContract, adapter=None) -> list[TestScenario]:
     items = _extract_json(raw)
     valid = _valid_units(contract)
+    # Allow-list value-grammar symbols against the tool-resolved types (adapter-specific;
+    # the python adapter exposes validate_scenario). A violation is a ValueError, so it
+    # routes through the repair-retry loop below — the model can't author code tokens.
+    validate = getattr(adapter, "validate_scenario", None)
     scenarios: list[TestScenario] = []
     for i, item in enumerate(items):
         scenario = TestScenario(**item)
@@ -121,6 +125,8 @@ def _parse_scenarios(raw: str, contract: TargetContract) -> list[TestScenario]:
                 f"Scenario {i} targets unknown unit '{scenario.unit}'. "
                 f"Allowed: {sorted(valid)}."
             )
+        if validate is not None:
+            validate(scenario, contract)
         scenarios.append(scenario)
     if not scenarios:
         raise ValueError("Model returned an empty scenario list.")
@@ -192,7 +198,7 @@ def generate_scenarios(
         spent_in += usage["input_tokens"]
         spent_out += usage["output_tokens"]
         try:
-            scenarios = _parse_scenarios(raw, contract)
+            scenarios = _parse_scenarios(raw, contract, adapter)
             logger.info(
                 "Generated %d scenario(s) for %s (attempt %d).",
                 len(scenarios), contract.ref.locator, attempt + 1,
