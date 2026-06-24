@@ -27,3 +27,8 @@ logs/
 .DS_Store
 .idea/
 .vscode/
+
+# Build artifacts (setuptools/pip wheel)
+build/
+dist/
+*.egg-info/
