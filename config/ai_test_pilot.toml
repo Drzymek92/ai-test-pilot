@@ -5,7 +5,7 @@
 [run]
 adapter        = "python_pytest"
 scenario_count = 6
-model_tier     = "bulk"          # FuelIX task tier (cheap | bulk | accurate); informational in M1
+model_tier     = "bulk"          # LLM task tier (cheap | bulk | accurate); informational in M1
 prompt_version = "v1"            # pin a version, or "auto" = deterministic ledger-best for this adapter
 output_dir     = "scripts/outputs"
 

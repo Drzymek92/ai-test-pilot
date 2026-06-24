@@ -1,7 +1,7 @@
 """AI Test Pilot — CLI entry point (M1).
 
 Pipeline: introspect → generate (LLM→JSON) → materialize → run → report.
-Stages 1/3/4 cost zero tokens; stage 2 is a single batched FuelIX call.
+Stages 1/3/4 cost zero tokens; stage 2 is a single batched LLM call.
 
 Examples:
     python scripts/main.py --target ../librarian/scripts/extract/extractors.py \
@@ -40,11 +40,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--adapter", help="adapter name (default: from config)")
     p.add_argument("--selector", help="comma-separated function names to scope introspection")
     p.add_argument("--count", type=int, help="max scenarios to request")
-    p.add_argument("--model", help="override the FuelIX model")
+    p.add_argument("--model", help="override the LLM model")
     p.add_argument("--prompt-version", help="prompt version (default: from config)")
     p.add_argument("--config", help="path to ai_test_pilot.toml")
     p.add_argument("--no-run", action="store_true", help="generate + materialize but skip running")
-    p.add_argument("--smoke", action="store_true", help="one tiny live FuelIX call, then exit")
+    p.add_argument("--smoke", action="store_true", help="one tiny live LLM call, then exit")
     # data-factory fixture provider
     p.add_argument("--fixtures", action="store_true",
                    help="seed scenario inputs with realistic data from synthetic-data-factory")
@@ -223,7 +223,7 @@ def run_pipeline(cfg: AppConfig, args: argparse.Namespace) -> RunReport:
         if fs_note:
             logger.info(fs_note)
 
-    # 2 — GENERATE (one FuelIX call, schema-validated)
+    # 2 — GENERATE (one LLM call, schema-validated)
     scenario_set = generate_scenarios(
         contract,
         adapter=adapter,
@@ -424,10 +424,10 @@ def main(argv: list[str] | None = None) -> int:
         from scripts.llm_client import smoke_test
         try:
             reply = smoke_test(model=args.model)
-            logger.info("FuelIX smoke OK — reply: %r", reply.strip())
+            logger.info("LLM smoke OK - reply: %r", reply.strip())
             return 0
         except Exception:
-            logger.exception("FuelIX smoke test FAILED.")
+            logger.exception("LLM smoke test FAILED.")
             return 1
 
     try:

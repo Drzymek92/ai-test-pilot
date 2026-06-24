@@ -34,9 +34,10 @@ target is a single new file with zero changes to the core:
   (dataclass + Pydantic, nested, `Decimal`/`datetime`/`Enum`, defaults) via `ast` — **without
   importing the target** — and builds real constructor calls. Lets it test domain/OO code, not just
   functions taking primitives.
-- **Characterization (golden) mode** — runs each call once and locks the assertion to the real
+- **Characterization (golden) mode** — runs each call and locks the assertion to the real
   result, turning a generated test into a regression guard. Guarded against time-bombs: it
-  double-runs and skips any clock/RNG-reading unit whose time isn't pinned.
+  double-runs and keeps only reproducible results, skipping any clock/RNG-reading unit whose
+  time isn't pinned.
 - **File & fixture inputs** — creates real temp files for file-processing functions, and can
   optionally seed inputs from a companion [synthetic data factory](https://github.com/Drzymek92/synthetic-data-factory).
 - **Failure triage** — a deterministic signal table classifies most failures for free
