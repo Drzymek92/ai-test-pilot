@@ -1,31 +1,113 @@
 # AI Test Pilot
 
-> An LLM-driven test generator with a shared core and pluggable adapters: point it at a Python
-> module or a web page, and it introspects the target, proposes test scenarios as schema-validated
-> JSON, renders them into runnable tests, runs them, and triages the failures.
+> An LLM-driven test generator with a shared core and pluggable adapters. Point it at a Python
+> module or a web page; it introspects the target, has an LLM propose test scenarios as
+> schema-validated JSON, renders them into runnable tests, runs them, and triages the failures.
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![CI](https://github.com/Drzymek92/ai-test-pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/Drzymek92/ai-test-pilot/actions/workflows/ci.yml)
 
-## Overview
+<!-- TODO: add a ~10s demo GIF here (generate → run → caught a mutant), then reference it: -->
+<!-- ![AI Test Pilot demo](docs/demo.gif) -->
 
-Most "AI writes your tests" tools let the model emit test *code* directly — which hallucinates
-imports, fabricates inputs, and asserts wrong things. AI Test Pilot takes the opposite stance: the
-LLM only ever returns **structured, schema-validated JSON** describing a scenario; every line of
-runnable code is rendered **deterministically** from that JSON. The LLM is used for the two
-genuinely fuzzy steps — *proposing* scenarios and *judging* ambiguous failures — and nothing else.
+**Why it's different:** most "AI writes your tests" tools let the model emit test *code* directly —
+which hallucinates imports, fabricates inputs, and asserts wrong things. AI Test Pilot takes the
+opposite stance: the LLM only ever returns **structured, schema-validated JSON**; every line of
+runnable code is rendered **deterministically** from that JSON. The LLM is used for the two genuinely
+fuzzy steps only — *proposing* scenarios and *judging* ambiguous failures — and nothing else.
 
-The same engine drives two target types through one **adapter seam**, so adding a new kind of
-target is a single new file with zero changes to the core:
+## Does it actually catch bugs?
 
-- **`python_pytest`** — points at a Python module, generates `pytest` tests.
-- **`web_playwright`** — points at a web page, generates Playwright end-to-end tests (and exports
-  idiomatic TypeScript alongside the runnable Python). In *served mode* it goes deeper: a `base_url`
-  + `auth_state` fixture pair (real `storage_state` reuse), `page.route` network interception,
-  `page.route_web_socket` WebSocket mocking, and an `async_playwright` variant.
+Coverage is a weak proxy — a suite can execute every line and assert nothing useful. The real test of
+a test generator is **kill rate**: generate a suite from *correct* code, then run it against a *buggy*
+version and count how many bugs a test that passed on the correct code now catches (standard
+mutation-testing semantics). The full reproducible eval ships in [`benchmark/`](benchmark/DETECTION.md).
+
+| Corpus | Kill rate (95% Wilson CI) | Notes |
+|---|---|---|
+| **QuixBugs** (external, default config) | **0.80** [0.584–0.919] (n=20) | human-verified correct↔buggy pairs |
+| **In-repo AST mutation** (full ablation) | **0.818** [0.523–0.949] (n=11) | controlled mutants; the "is it overengineered?" ablation substrate |
+| **HumanEval held-out — standard tool (cosmic-ray)** | **0.923** [0.906–0.937] (n=1166) | re-measured with a standard mutation tool on code never seen during development |
+
+**vs a search-based peer:** on the same QuixBugs targets and the same kill mechanic, **ours 0.80 vs
+Pynguin's 0.30** (Pynguin at a modest 30s/SIMPLE budget — a floor; even the literature's stronger SBST
+range, ~0.59–0.70, sits below 0.80). The edge is the **coverage-feedback loop** — after the first pass
+the suite's uncovered lines are fed back to the LLM to reach them — the feedback mechanism plain LLM
+test-generation lacks.
+
+**Honest framing:** that held-out number was *first* measured with this repo's own lightweight mutation
+operators (0.98) — a generalization check, **not** a PIT-style mutation score — so it's reframed and
+**re-measured with a standard tool (0.923)** for a comparable figure; cosmic-ray doesn't exclude
+equivalent mutants, so 0.923 is a conservative lower bound, and the harder, most representative number
+remains QuixBugs **0.80**. Methodology, comparables vs the literature, and re-run procedure:
+**[benchmark/DETECTION.md](benchmark/DETECTION.md)**.
+
+```bash
+python scripts/main.py detect --subset 20      # QuixBugs + in-repo mutation kill rate + feature ablation
+```
+
+## Demo — sample run
+
+```text
+$ python scripts/main.py --target path/to/rules/commission.py --selector compute_commission --golden
+
+introspected 1 unit(s); resolved types: OrderView, LineItemView, RulesConfig, CommissionRules
+generated 5 scenario(s)
+golden mode: locked 5 characterization assertion(s)
+run complete: 5/5 passed
+
+✓ 5 passed · 0 failed · 0 error / 5 generated
+  tests:  scripts/outputs/tests/test_commission_<ts>.py
+  report: scripts/outputs/reports/report_<ts>.md
+```
+
+A generated test constructs the real typed inputs and locks the computed result:
+
+```python
+def test_standard_commission():
+    """Commission for a multi-item order."""
+    result = compute_commission(
+        order=OrderView(currency="PLN", status="DELIVERED", line_items=[
+            LineItemView(category="electronics", unit_amount=Decimal("100.00"), quantity=2)]),
+        config=RulesConfig())
+    assert repr(result) == ("CommissionBreakdown(currency='PLN', "
+        "items_commission=Decimal('4.00'), transaction_fee=Decimal('1.00'), "
+        "total_commission=Decimal('5.00'), rule_version='v1')")
+```
+
+For the `web_playwright` adapter, the same pipeline produces self-contained Playwright tests and an
+idiomatic `.spec.ts` export. Three sample targets are included: `demo/signup.html` (simple form),
+`demo/login_app/` (served — auth/`storage_state` + API interception), and `demo/ws_app/` (served —
+WebSocket push/echo). The served demos are run with `--serve`:
+
+```bash
+# deep web: emits base_url + auth_state fixtures, page.route interception, async variant
+python scripts/main.py --adapter web_playwright --target demo/login_app/index.html --serve
+
+# websocket: emits page.route_web_socket mock (server push + echo) + expect_ws_message
+python scripts/main.py --adapter web_playwright --target demo/ws_app/index.html --serve
+```
 
 ## Features
+
+- **Structured-output pipeline** — the LLM returns JSON validated against a Pydantic schema; every line
+  of test code is rendered deterministically from the validated objects, never written by the model.
+- **Typed-input construction** — resolves parameter *types* from source (dataclass/Pydantic/`attrs`/
+  `NamedTuple`, nested) via `ast` **without importing the target**, so it tests real domain/OO code, not
+  just functions taking primitives.
+- **Reproducible & fail-safe** — `temperature=0` + a scenario cache replay identical tests for an
+  unchanged target; the LLM call has timeout/retry and a documented **exit-code contract**, so it never
+  emits a half-generated suite.
+- **Proven bug detection** — a `detect` command measures **mutation kill rate** (not just coverage),
+  with a feature ablation and a **coverage-feedback loop** plain LLM test-gen lacks.
+- **Advanced Playwright (served mode)** — `base_url`/`auth_state` fixtures, `storage_state` reuse,
+  `page.route` network interception, and in-process WebSocket mocking — all from JSON the model emits.
+- **MCP server + quality/cost gates** — callable from any MCP client; a quality-regression gate
+  (false-positive rate, test-smell density…) and opt-in budget caps that abort before overspending.
+
+<details>
+<summary><b>Full feature detail</b> (click to expand)</summary>
 
 - **Structured-output pipeline** — the LLM returns JSON validated against a Pydantic schema (with a
   one-shot repair retry); code is generated from the validated objects, never written by the model.
@@ -86,6 +168,15 @@ target is a single new file with zero changes to the core:
   uncovered lines back to the LLM to target them — the feedback mechanism single-shot LLM test-gen
   lacks. See [Does it actually catch bugs?](#does-it-actually-catch-bugs) and `benchmark/DETECTION.md`.
 
+</details>
+
+The same engine drives two target types through one **adapter seam**, so adding a new kind of
+target is a single new file with zero changes to the core:
+
+- **`python_pytest`** — points at a Python module, generates `pytest` tests.
+- **`web_playwright`** — points at a web page, generates Playwright end-to-end tests (and exports
+  idiomatic TypeScript alongside the runnable Python).
+
 ## How it works
 
 ```mermaid
@@ -110,78 +201,6 @@ flowchart TD
     RG --> A2[web_playwright adapter]
     A1 --> P[(pytest)]
     A2 --> PW[(Playwright + TS export)]
-```
-
-## Demo — sample run
-
-```text
-$ python scripts/main.py --target path/to/rules/commission.py --selector compute_commission --golden
-
-introspected 1 unit(s); resolved types: OrderView, LineItemView, RulesConfig, CommissionRules
-generated 5 scenario(s)
-golden mode: locked 5 characterization assertion(s)
-run complete: 5/5 passed
-
-✓ 5 passed · 0 failed · 0 error / 5 generated
-  tests:  scripts/outputs/tests/test_commission_<ts>.py
-  report: scripts/outputs/reports/report_<ts>.md
-```
-
-A generated test constructs the real typed inputs and locks the computed result:
-
-```python
-def test_standard_commission():
-    """Commission for a multi-item order."""
-    result = compute_commission(
-        order=OrderView(currency="PLN", status="DELIVERED", line_items=[
-            LineItemView(category="electronics", unit_amount=Decimal("100.00"), quantity=2)]),
-        config=RulesConfig())
-    assert repr(result) == ("CommissionBreakdown(currency='PLN', "
-        "items_commission=Decimal('4.00'), transaction_fee=Decimal('1.00'), "
-        "total_commission=Decimal('5.00'), rule_version='v1')")
-```
-
-For the `web_playwright` adapter, the same pipeline produces self-contained Playwright tests and an
-idiomatic `.spec.ts` export. Three sample targets are included: `demo/signup.html` (simple form),
-`demo/login_app/` (served — auth/`storage_state` + API interception), and `demo/ws_app/` (served —
-WebSocket push/echo). The served demos are run with `--serve`:
-
-```bash
-# deep web: emits base_url + auth_state fixtures, page.route interception, async variant
-python scripts/main.py --adapter web_playwright --target demo/login_app/index.html --serve
-
-# websocket: emits page.route_web_socket mock (server push + echo) + expect_ws_message
-python scripts/main.py --adapter web_playwright --target demo/ws_app/index.html --serve
-```
-
-## Does it actually catch bugs?
-
-Coverage is a weak proxy — a suite can execute every line and assert nothing useful. The real test of
-a test generator is **kill rate**: generate a suite from *correct* code, then run it against a *buggy*
-version and count how many bugs a test that passed on the correct code now catches (standard
-mutation-testing semantics). The full reproducible eval ships in [`benchmark/`](benchmark/DETECTION.md).
-
-| Corpus | Kill rate (95% Wilson CI) | Notes |
-|---|---|---|
-| **QuixBugs** (external, default config) | **0.80** [0.584–0.919] (n=20) | human-verified correct↔buggy pairs |
-| **In-repo AST mutation** (full ablation) | **0.818** [0.523–0.949] (n=11) | controlled mutants; the "is it overengineered?" ablation substrate |
-| **HumanEval held-out — standard tool (cosmic-ray)** | **0.923** [0.906–0.937] (n=1166) | re-measured with a standard mutation tool on code never seen during development |
-
-**vs a search-based peer:** on the same QuixBugs targets and the same kill mechanic, **ours 0.80 vs
-Pynguin's 0.30** (Pynguin at a modest 30s/SIMPLE budget — a floor; even the literature's stronger SBST
-range, ~0.59–0.70, sits below 0.80). The edge is the **coverage-feedback loop** — after the first pass
-the suite's uncovered lines are fed back to the LLM to reach them — the feedback mechanism plain LLM
-test-generation lacks.
-
-**Honest framing:** that held-out number was *first* measured with this repo's own lightweight mutation
-operators (0.98) — a generalization check, **not** a PIT-style mutation score — so it's reframed and
-**re-measured with a standard tool (0.923)** for a comparable figure; cosmic-ray doesn't exclude
-equivalent mutants, so 0.923 is a conservative lower bound, and the harder, most representative number
-remains QuixBugs **0.80**. Methodology, comparables vs the literature, and re-run procedure:
-**[benchmark/DETECTION.md](benchmark/DETECTION.md)**.
-
-```bash
-python scripts/main.py detect --subset 20      # QuixBugs + in-repo mutation kill rate + feature ablation
 ```
 
 ## Tech Stack
