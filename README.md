@@ -8,8 +8,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![CI](https://github.com/Drzymek92/ai-test-pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/Drzymek92/ai-test-pilot/actions/workflows/ci.yml)
 
-<!-- TODO: add a ~10s demo GIF here (generate → run → caught a mutant), then reference it: -->
-<!-- ![AI Test Pilot demo](docs/demo.gif) -->
+![AI Test Pilot — generate, run, and lock a golden suite in one command](docs/demo.gif)
 
 **Why it's different:** most "AI writes your tests" tools let the model emit test *code* directly —
 which hallucinates imports, fabricates inputs, and asserts wrong things. AI Test Pilot takes the
