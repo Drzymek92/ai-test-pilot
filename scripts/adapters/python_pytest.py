@@ -10,6 +10,7 @@ The build-first, no-Node half of the tool.
 from __future__ import annotations
 
 import ast
+import builtins
 import functools
 import re
 from pathlib import Path
@@ -761,13 +762,108 @@ def _check_value(node, *, types: set[str], enums: dict[str, list[str]]) -> None:
             _check_value(v, types=types, enums=enums)
 
 
+# ── assertion / expect_error allow-list (security: both are interpolated RAW into executed
+#    code by pytest_function_v1.j2 — `assert {{ s.assertion }}` and `pytest.raises({{ s.expect_error }})`.
+#    Without this the model authors live code there (e.g. `__import__('os').system('...') or True`),
+#    breaking the "every runnable line is rendered deterministically, never written by the model"
+#    invariant — the same gap _check_value closes for inputs. Generation-time only (a ValueError
+#    routes through generate()'s repair-retry); golden mode rewrites the assertion deterministically
+#    AFTER this, so characterization locks are unaffected. ──
+
+# Builtins safe to NAME or CALL inside an assertion. Deliberately EXCLUDES the introspection /
+# escape primitives: eval, exec, compile, open, getattr, setattr, delattr, vars, globals,
+# locals, __import__, input, breakpoint.
+_ASSERT_BUILTINS = frozenset({
+    "len", "abs", "all", "any", "isinstance", "issubclass", "sorted", "sum", "min", "max",
+    "round", "type", "repr", "set", "frozenset", "list", "dict", "tuple", "str", "int",
+    "float", "bool", "bytes", "range", "enumerate", "zip", "divmod", "hash", "ord", "chr",
+    "hex", "format",
+})
+
+# Builtin exception names — the only un-imported symbols allowed as an `expect_error` target.
+_BUILTIN_EXCEPTIONS = frozenset(
+    n for n in dir(builtins)
+    if isinstance(getattr(builtins, n), type) and issubclass(getattr(builtins, n), BaseException)
+)
+
+
+def _bound_names(tree: ast.AST) -> set[str]:
+    """Identifiers bound locally inside the expression (comprehension targets, lambda args).
+    Safe to reference as Names — they're author-chosen loop/arg vars that can't reach globals."""
+    bound: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+            for gen in node.generators:
+                for t in ast.walk(gen.target):
+                    if isinstance(t, ast.Name):
+                        bound.add(t.id)
+        elif isinstance(node, ast.Lambda):
+            a = node.args
+            for arg in [*a.posonlyargs, *a.args, *a.kwonlyargs]:
+                bound.add(arg.arg)
+            if a.vararg:
+                bound.add(a.vararg.arg)
+            if a.kwarg:
+                bound.add(a.kwarg.arg)
+    return bound
+
+
+def _check_assertion(expr: str, allowed_names: set[str]) -> None:
+    """AST-walk a model-authored assertion expression; reject any Load-name not in
+    `allowed_names` and any dunder name/attribute (the classic sandbox-escape vector).
+    Method/attribute access on `result` is permitted (trusted-code domain); only NEW
+    global symbols and dunder traversal are blocked. Raises ValueError."""
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError as e:
+        raise ValueError(f"assertion is not a parseable expression: {expr!r} ({e})")
+    names = allowed_names | _bound_names(tree)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute):
+            if node.attr.startswith("__") and node.attr.endswith("__"):
+                raise ValueError(
+                    f"assertion: dunder attribute '.{node.attr}' is not allowed (in {expr!r})")
+        elif isinstance(node, ast.Name):
+            nm = node.id
+            if nm.startswith("__") and nm.endswith("__"):
+                raise ValueError(f"assertion: dunder name {nm!r} is not allowed (in {expr!r})")
+            if isinstance(node.ctx, ast.Load) and nm not in names:
+                raise ValueError(
+                    f"assertion: name {nm!r} is not allow-listed (in {expr!r}); allowed: "
+                    f"result, resolved types/enums, scalar constructors, and a safe builtin subset")
+
+
+def _check_expect_error(expr: str, allowed_exceptions: set[str]) -> None:
+    """An `expect_error` must NAME a known exception (or be a tuple of them) — never an
+    arbitrary expression. Raises ValueError on anything else."""
+    try:
+        body = ast.parse(expr, mode="eval").body
+    except SyntaxError as e:
+        raise ValueError(f"expect_error is not a parseable exception expression: {expr!r} ({e})")
+    candidates = body.elts if isinstance(body, ast.Tuple) else [body]
+    for c in candidates:
+        if not isinstance(c, ast.Name):
+            raise ValueError(
+                f"expect_error must name an exception, or a tuple of them, not {expr!r}")
+        if c.id not in allowed_exceptions:
+            raise ValueError(
+                f"expect_error: {c.id!r} is not a known exception "
+                f"(a builtin exception or a type resolved from the target)")
+
+
 def validate_scenario(scenario: TestScenario, contract: TargetContract) -> None:
-    """Allow-list every value-grammar symbol in a scenario's inputs against the types the
-    tool resolved from the target's own source. Raises ValueError on any unknown symbol."""
+    """Allow-list every value-grammar symbol in a scenario's inputs AND every symbol in its
+    model-authored assertion / expect_error against what the tool resolved from the target's
+    own source. Raises ValueError on any unknown symbol (routed through the repair-retry)."""
     types = set(contract.types)
     enums = {n: t.enum_members for n, t in contract.types.items() if t.kind == "enum"}
     for v in scenario.inputs.values():
         _check_value(v, types=types, enums=enums)
+    if scenario.assertion:
+        allowed = {"result"} | _ASSERT_BUILTINS | set(_SCALAR_IMPORTS) | types
+        _check_assertion(scenario.assertion, allowed)
+    if scenario.expect_error:
+        _check_expect_error(scenario.expect_error, _BUILTIN_EXCEPTIONS | types)
 
 
 def _collect_symbols(node, types_used: set, calls_used: set, enums_used: set) -> None:
