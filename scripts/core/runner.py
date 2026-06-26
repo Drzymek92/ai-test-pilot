@@ -6,6 +6,7 @@ mapping — no extra plugin needed. Results map back to scenarios by function na
 """
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -73,9 +74,15 @@ def run_tests(
     timeout = None
     if per_test_timeout and per_test_timeout > 0:
         timeout = per_test_timeout * max(1, len(scenario_set.scenarios)) + _TIMEOUT_BUFFER
+    # Suppress .pyc writes in the test subprocess. Detection's mutation mechanic rewrites a
+    # target in place — often the same byte-length and within the same filesystem mtime second
+    # (e.g. `return a + b` -> `return a - b`). CPython validates a cached .pyc by (mtime, size),
+    # so it would reuse the STALE bytecode and silently miss the mutant. No bytecode cache =>
+    # every import recompiles from the current source. Harmless for the normal pipeline too.
+    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True,
-                              cwd=str(cwd) if cwd else None, timeout=timeout)
+                              cwd=str(cwd) if cwd else None, timeout=timeout, env=env)
     except subprocess.TimeoutExpired:
         junit.unlink(missing_ok=True)
         logger.error("Run exceeded the %.0fs budget -- killed; marking all scenarios timed-out.",

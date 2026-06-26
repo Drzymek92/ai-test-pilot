@@ -120,7 +120,14 @@ def _coverage(test_file: str, project_root: Path, grep: str, cover_dir: Path) ->
 def panel_regressions(baseline: dict, current: dict, *, tol: float = 0.0) -> dict:
     """Per-metric regressions vs baseline. Lower-is-better metrics are negated so the shared
     drop-detector (`metric_regressions`) catches a harmful RISE as a drop."""
-    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))  # repo root → commons
+    import sys
+    # Locate the dir holding `commons/`: the repo root in the working monorepo (commons is shared)
+    # OR the vendored copy at the standalone portfolio root. Walking up works at any nesting depth
+    # — a fixed parents[N] broke in a flat CI clone where commons isn't an ancestor.
+    _root = next((p for p in Path(__file__).resolve().parents
+                  if (p / "commons" / "evals" / "regression.py").is_file()), None)
+    if _root and str(_root) not in sys.path:
+        sys.path.insert(0, str(_root))
     from commons.evals.regression import metric_regressions
 
     def _orient(panel: dict) -> dict[str, float]:

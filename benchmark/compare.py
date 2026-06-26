@@ -17,9 +17,12 @@ import json
 import sys
 from pathlib import Path
 
-# repo-root bootstrap so `commons` imports without install:
-# benchmark/compare.py -> benchmark -> ai-test-pilot -> projects -> Claude_Projects
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+# repo-root bootstrap so `commons` imports without install: walk up to the dir holding `commons/`
+# (the shared monorepo root, or the vendored copy at the standalone portfolio root) at any depth.
+_root = next((p for p in Path(__file__).resolve().parents
+              if (p / "commons" / "evals" / "regression.py").is_file()), None)
+if _root and str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
 from commons.evals.regression import metric_regressions  # noqa: E402
 
 

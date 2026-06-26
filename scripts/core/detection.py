@@ -514,7 +514,13 @@ def _write_holdout_md(result: dict, path: Path) -> None:
 # ── regression gate (reuse commons kernel; all kill-rate metrics are higher-better) ──
 def _panel_regressions(baseline: dict, current: dict, *, tol: float) -> dict:
     import sys
-    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))   # repo root → commons
+    # Locate the dir holding `commons/`: the repo root in the working monorepo (commons is shared)
+    # OR the vendored copy at the standalone portfolio root. Walking up works at any nesting depth
+    # — a fixed parents[N] broke in a flat CI clone where commons isn't an ancestor.
+    _root = next((p for p in Path(__file__).resolve().parents
+                  if (p / "commons" / "evals" / "regression.py").is_file()), None)
+    if _root and str(_root) not in sys.path:
+        sys.path.insert(0, str(_root))
     from commons.evals.regression import metric_regressions
     common = {k for k in baseline if k in current and baseline[k] is not None and current[k] is not None}
     return metric_regressions({k: baseline[k] for k in common},
