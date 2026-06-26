@@ -1,12 +1,16 @@
-# Map — `main.py`
+# Map — entry / CLI / pipeline (`main.py` · `cli.py` · `pipeline.py`)
 
-CLI entry point + the orchestration that every interface reuses. `run_pipeline(cfg, args)` is the
-single function the MCP server (`mcp_server.py`) also calls — so there is one pipeline, not two.
+Split by concern: `scripts/main.py` is a thin launcher (re-exports `main`/`EXIT_*`/
+`run_pipeline`); `scripts/cli.py` holds arg parsing + subcommand dispatch + the exit-code contract;
+`scripts/pipeline.py` holds `run_pipeline(cfg, req)`; `scripts/core/report.py` renders the run report.
+`run_pipeline` takes a typed `RunRequest` and is the single function the MCP server, `sweep`,
+`quality`, and `detection` also call — one pipeline, not two.
 
 ## Entry points
-- `main(argv)` — dispatches by first token: `accept <run_id> --kept N` → `_accept_cmd` (ledger
-  backfill); `promote <run_id|file>` → `_promote_cmd`; `discover <project>` → `_discover_cmd`;
-  otherwise `--smoke` → one LLM call, or `load_config` → `run_pipeline` → print summary + caveats.
+- `cli.main(argv)` — dispatches by first token via `_SUBCOMMANDS`: `accept` → `_accept_cmd` (ledger
+  backfill); `promote` → `_promote_cmd`; `discover` → `_discover_cmd`; `quality`/`detect`/`holdout`/
+  `sweep` → their handlers; otherwise `--smoke` → one LLM call, or `load_config` →
+  `RunRequest.from_namespace` → `run_pipeline` → print summary + caveats. (`main.py` re-exports it.)
 - `_accept_cmd(rest)` — its own argparse; calls `ledger.backfill_acceptance`.
 - `_discover_cmd(rest)` — `discover <project|path>` lists testable-now vs needs-fixtures targets
   across a project's `scripts/` (ast-only, zero tokens). `--changed` / `--since <ref>` restrict the
@@ -26,7 +30,7 @@ single function the MCP server (`mcp_server.py`) also calls — so there is one 
 7. persist scenarios JSON → **3 materialize** (`.py` + optional `.spec.ts`) → **4 run** (`runner.run_tests`).
 8. **5 triage** (`triage.triage`, only if failures) → counts.
 9. build `RunReport` → **6 ledger** (`ledger.append RunRecord`) → **7 tuning** (`tuning.suggestions`).
-10. `_write_report` → markdown (scenarios table + failure triage + tuning sections + caveats).
+10. `report.write_report` (`core/report.py`) → markdown (scenarios table + failure triage + tuning + caveats).
 
 ## Notes
 - Adapter-agnostic: web vs python differences are entirely inside the adapter + `generate`'s

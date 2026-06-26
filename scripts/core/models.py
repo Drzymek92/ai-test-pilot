@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TargetRef(BaseModel):
@@ -57,12 +57,23 @@ class TypeSpec(BaseModel):
 
     Recovered deterministically by ast-parsing the defining module (never imported).
     Lets the LLM describe how to BUILD a typed param instead of fabricating a dict.
+
+    A3 (usage-guided construction) adds three more strategies so green≈0 targets become testable:
+      - `initclass`: a plain class — construct the REAL object via its `__init__` signature.
+      - `duck`:      an opaque/third-party type — a `types.SimpleNamespace` stand-in carrying just the
+                     attributes the function body actually reads (inferred from in-body usage).
+      - `builder`:   a user-provided builder (config) constructs it — the safe hatch for types the
+                     above can't build (cyclic graphs, validator-heavy configs).
+    All four render through the SAME `$type` value grammar + allow-list, so the model still only
+    authors JSON. `module` is "" for `duck`/`builder` (synthesized / imported via `builder`).
     """
     name: str
-    kind: Literal["dataclass", "pydantic", "enum", "attrs", "namedtuple"]
-    module: str                       # importable module the type lives in
-    fields: list[FieldSpec] = Field(default_factory=list)   # dataclass/pydantic
+    kind: Literal["dataclass", "pydantic", "enum", "attrs", "namedtuple", "initclass", "duck", "builder"]
+    module: str                       # importable module the type lives in ("" for duck/builder)
+    fields: list[FieldSpec] = Field(default_factory=list)   # dataclass/pydantic/initclass; duck=attrs
     enum_members: list[str] = Field(default_factory=list)   # enum only (member names)
+    builder: str | None = None        # A3(c): "dotted.module:func" used to build a `builder` type
+    usage_hint: str | None = None     # A3(b): observed construction from callers, e.g. "Node(value=, successors=)"
 
 
 class TargetContract(BaseModel):
@@ -148,6 +159,44 @@ class TriageVerdict(BaseModel):
     source: Literal["deterministic", "llm"] = "deterministic"
 
 
+class RunRequest(BaseModel):
+    """Typed INPUT contract for `run_pipeline`.
+
+    Replaces the raw `argparse.Namespace` the pipeline used to consume. There is exactly ONE place each
+    field is named (here), so the five callers that drive the pipeline — the CLI, `sweep`, `quality`,
+    `detection`, and the MCP server — build a `RunRequest` instead of each hand-rolling a namespace.
+    That eliminated a real bug class: a namespace missing a field added later (e.g. `feedback`)
+    crashed `run_pipeline` at access time; defaults here make every field always present.
+    """
+    model_config = ConfigDict(extra="forbid")
+    target: str | None = None
+    adapter: str | None = None
+    selector: str | None = None
+    count: int | None = None
+    model: str | None = None
+    prompt_version: str | None = None
+    no_run: bool = False
+    no_cache: bool = False             # P1 reproducibility
+    refresh_cache: bool = False
+    fixtures: bool = False             # data-factory fixtures
+    fixture_domain: str | None = None
+    fixture_entity: str | None = None
+    fixture_rows: int | None = None
+    context: str | None = None         # project domain-context
+    no_context: bool = False
+    no_cut_source: bool = False
+    golden: bool = False
+    feedback: bool = False             # A1 coverage-feedback loop
+    no_feedback: bool = False
+    serve: bool = False                # web adapter (served mode)
+    web_async: bool = False
+
+    @classmethod
+    def from_namespace(cls, ns: Any) -> "RunRequest":
+        """Build from an argparse.Namespace (the CLI). Missing attrs fall back to the field defaults."""
+        return cls(**{k: getattr(ns, k) for k in cls.model_fields if hasattr(ns, k)})
+
+
 class RunReport(BaseModel):
     """M1 run summary (the M2 ledger persists a richer RunRecord)."""
     run_id: str
@@ -169,6 +218,8 @@ class RunReport(BaseModel):
     tokens_in: int = 0                 # P4: real generation spend this run (0 on a cache replay)
     tokens_out: int = 0
     cost_est: float = 0.0
+    feedback_rounds: int = 0           # Approach 1: coverage-feedback regeneration rounds run
+    feedback_added: int = 0            # Approach 1: extra scenarios added by the feedback loop
 
 
 class RunRecord(BaseModel):

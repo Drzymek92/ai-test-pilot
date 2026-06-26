@@ -112,6 +112,27 @@ def test_llm_call_succeeds_after_transient_failure(monkeypatch):
     assert attempts["n"] == 2
 
 
+def test_llm_call_is_hard_bounded_on_a_wedged_socket(monkeypatch):
+    """A wedged `invoke` that ignores the client timeout must NOT hang the call: the hard
+    wall-clock deadline abandons it, the retry loop runs, and LLMError is raised promptly.
+    (Regression for the gateway wedge that hung a whole `detect` run for hours.)"""
+    import threading as _thr
+    import time as _t
+
+    class _Wedged:
+        def invoke(self, _messages):
+            _thr.Event().wait(30)                       # block (not time.sleep, which the patch stubs)
+            return type("R", (), {"content": "never"})()
+
+    monkeypatch.setattr(llm_client, "get_llm", lambda **k: _Wedged())
+    monkeypatch.setattr(llm_client.time, "sleep", lambda *_: None)   # skip backoff waits
+    start = _t.monotonic()
+    with pytest.raises(LLMError):
+        # timeout=1 → hard deadline 1.5s; 2 attempts ≈ 3s, nowhere near 30s × attempts.
+        llm_client.llm_call("hi", timeout=1, retries=1)
+    assert _t.monotonic() - start < 10                  # returned control, did not hang on the 30s sleep
+
+
 # ── P2: runner bounds a hanging test ─────────────────────────────────────────
 def test_runner_timeout_marks_all_timed_out(tmp_path, monkeypatch):
     from scripts.adapters import python_pytest as adapter

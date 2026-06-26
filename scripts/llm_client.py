@@ -8,6 +8,7 @@ Thin wrapper over langchain-openai's ChatOpenAI pointed at an OpenAI-compatible 
     and surfaces token usage for spend accounting (P4).
 """
 import os
+import threading
 import time
 from pathlib import Path
 
@@ -23,6 +24,9 @@ DEFAULT_TEMPERATURE = 0.0
 DEFAULT_TIMEOUT = 60.0     # seconds per LLM request (P2)
 DEFAULT_RETRIES = 2        # transient-failure retries after the first attempt (P2)
 _BACKOFF_BASE = 2.0        # seconds; doubles each retry
+# HARD wall-clock multiple of `timeout` after which we ABANDON a wedged call (P2). The client's own
+# `timeout` should fire first; this is the backstop for a stuck socket the client timeout misses.
+_HARD_DEADLINE_FACTOR = 1.5
 
 # Load env from config/.env (project root, regardless of cwd) so a standalone run picks up
 # credentials. dotenv does not override vars already set, so an explicit environment wins.
@@ -92,6 +96,32 @@ def _extract_usage(msg) -> dict[str, int]:
             "output_tokens": int(tu.get("completion_tokens", 0))}
 
 
+def _invoke_with_deadline(llm, messages, deadline: float):
+    """Run `llm.invoke` in a daemon worker, bounded by a HARD wall-clock `deadline` (seconds).
+
+    Returns the message on success, re-raises the worker's exception, or raises TimeoutError if the
+    deadline passes — in which case the worker thread is ABANDONED (a wedged socket can't be killed
+    cooperatively in Python; the daemon dies with the process or when the socket finally errors).
+    This guarantees control returns to the retry loop instead of hanging the whole run indefinitely.
+    """
+    box: dict[str, object] = {}
+
+    def _worker() -> None:
+        try:
+            box["msg"] = llm.invoke(messages)
+        except Exception as exc:                        # noqa: BLE001 — surfaced to the caller below
+            box["err"] = exc
+
+    t = threading.Thread(target=_worker, name="llm-invoke", daemon=True)
+    t.start()
+    t.join(deadline)
+    if t.is_alive():
+        raise TimeoutError(f"LLM call exceeded hard deadline of {deadline:.0f}s (socket wedged)")
+    if "err" in box:
+        raise box["err"]                                # type: ignore[misc]
+    return box["msg"]
+
+
 def llm_call(prompt: str, system: str | None = None, model: str | None = None,
              temperature: float = DEFAULT_TEMPERATURE, timeout: float | None = DEFAULT_TIMEOUT,
              retries: int = DEFAULT_RETRIES, return_usage: bool = False, **kwargs):
@@ -107,10 +137,11 @@ def llm_call(prompt: str, system: str | None = None, model: str | None = None,
         messages.append(SystemMessage(content=system))
     messages.append(HumanMessage(content=prompt))
 
+    hard_deadline = (timeout or DEFAULT_TIMEOUT) * _HARD_DEADLINE_FACTOR
     last_err: Exception | None = None
     for attempt in range(retries + 1):
         try:
-            msg = llm.invoke(messages)
+            msg = _invoke_with_deadline(llm, messages, hard_deadline)
             return (msg.content, _extract_usage(msg)) if return_usage else msg.content
         except Exception as exc:                       # noqa: BLE001 — classify, then retry/raise
             last_err = exc

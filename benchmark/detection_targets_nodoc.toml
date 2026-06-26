@@ -1,0 +1,9 @@
+# Golden-mode stress corpus (a SEPARATE manifest, run on demand — not the tracked baseline).
+# No-docstring functions whose exact output is hard to predict from source, so golden mode can show
+# whether it rescues kill rate where cut-source-alone under-performs.
+#   python scripts/main.py detect --corpus mutation --manifest benchmark/detection_targets_nodoc.toml --max-mutants 15
+
+[[target]]
+name     = "nodoc_hard"
+path     = "benchmark/fixtures/nodoc_sample.py"
+selector = "_luhn_checksum,_weighted_checksum,_poly_eval,_alternating_sum,_grade_points"

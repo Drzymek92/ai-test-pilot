@@ -1,0 +1,160 @@
+{
+  "ts": "2026-06-26T16:37:00",
+  "tool": "pynguin",
+  "corpus": "quixbugs",
+  "subset": 20,
+  "search_time_s": 30,
+  "seed": 0,
+  "n": 20,
+  "scored": 17,
+  "killed": 6,
+  "kill_rate": 0.3,
+  "kill_rate_scored": 0.353,
+  "kill_rate_ci": [
+    0.145,
+    0.519
+  ],
+  "ours_quixbugs_kill_rate": 0.8,
+  "cases": [
+    {
+      "name": "bitcount",
+      "scored": true,
+      "killed": true,
+      "green": 2,
+      "note": ""
+    },
+    {
+      "name": "breadth_first_search",
+      "scored": true,
+      "killed": false,
+      "green": 1,
+      "note": ""
+    },
+    {
+      "name": "bucketsort",
+      "scored": true,
+      "killed": false,
+      "green": 2,
+      "note": ""
+    },
+    {
+      "name": "depth_first_search",
+      "scored": true,
+      "killed": false,
+      "green": 2,
+      "note": ""
+    },
+    {
+      "name": "detect_cycle",
+      "scored": true,
+      "killed": false,
+      "green": 1,
+      "note": ""
+    },
+    {
+      "name": "find_first_in_sorted",
+      "scored": true,
+      "killed": true,
+      "green": 5,
+      "note": ""
+    },
+    {
+      "name": "find_in_sorted",
+      "scored": true,
+      "killed": true,
+      "green": 2,
+      "note": ""
+    },
+    {
+      "name": "flatten",
+      "scored": false,
+      "killed": false,
+      "green": 0,
+      "note": "no green baseline (suite not green on correct)"
+    },
+    {
+      "name": "gcd",
+      "scored": true,
+      "killed": false,
+      "green": 2,
+      "note": ""
+    },
+    {
+      "name": "get_factors",
+      "scored": true,
+      "killed": false,
+      "green": 3,
+      "note": ""
+    },
+    {
+      "name": "hanoi",
+      "scored": true,
+      "killed": false,
+      "green": 1,
+      "note": ""
+    },
+    {
+      "name": "is_valid_parenthesization",
+      "scored": true,
+      "killed": false,
+      "green": 4,
+      "note": ""
+    },
+    {
+      "name": "kheapsort",
+      "scored": false,
+      "killed": false,
+      "green": 0,
+      "note": "no green baseline (suite not green on correct)"
+    },
+    {
+      "name": "knapsack",
+      "scored": true,
+      "killed": false,
+      "green": 2,
+      "note": ""
+    },
+    {
+      "name": "kth",
+      "scored": false,
+      "killed": false,
+      "green": 0,
+      "note": "pynguin produced no suite"
+    },
+    {
+      "name": "lcs_length",
+      "scored": true,
+      "killed": true,
+      "green": 2,
+      "note": ""
+    },
+    {
+      "name": "levenshtein",
+      "scored": true,
+      "killed": true,
+      "green": 2,
+      "note": ""
+    },
+    {
+      "name": "lis",
+      "scored": true,
+      "killed": true,
+      "green": 2,
+      "note": ""
+    },
+    {
+      "name": "longest_common_subsequence",
+      "scored": true,
+      "killed": false,
+      "green": 3,
+      "note": ""
+    },
+    {
+      "name": "max_sublist_sum",
+      "scored": true,
+      "killed": false,
+      "green": 1,
+      "note": ""
+    }
+  ]
+}

@@ -1,0 +1,423 @@
+{
+  "ts": "2026-06-25T16:16:06",
+  "corpus": "humaneval",
+  "locked": true,
+  "feedback": false,
+  "model": "gemini-3.1-pro",
+  "kill_rate": 0.98,
+  "humaneval": {
+    "available": true,
+    "problems": 50,
+    "problems_with_green": 50,
+    "mutants": 201,
+    "killed": 197,
+    "equivalent": 3,
+    "kill_rate": 0.98,
+    "cases": [
+      {
+        "task_id": "HumanEval/0",
+        "name": "has_close_elements",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/1",
+        "name": "separate_paren_groups",
+        "green": 5,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/2",
+        "name": "truncate_number",
+        "green": 6,
+        "mutants": 3,
+        "killed": 3,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/3",
+        "name": "below_zero",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/4",
+        "name": "mean_absolute_deviation",
+        "green": 6,
+        "mutants": 4,
+        "killed": 4,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/5",
+        "name": "intersperse",
+        "green": 6,
+        "mutants": 4,
+        "killed": 4,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/6",
+        "name": "parse_nested_parens",
+        "green": 6,
+        "mutants": 5,
+        "killed": 5,
+        "equivalent": 1
+      },
+      {
+        "task_id": "HumanEval/7",
+        "name": "filter_by_substring",
+        "green": 6,
+        "mutants": 2,
+        "killed": 2,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/8",
+        "name": "sum_product",
+        "green": 6,
+        "mutants": 5,
+        "killed": 5,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/9",
+        "name": "rolling_max",
+        "green": 6,
+        "mutants": 3,
+        "killed": 3,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/10",
+        "name": "make_palindrome",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/11",
+        "name": "string_xor",
+        "green": 6,
+        "mutants": 4,
+        "killed": 4,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/12",
+        "name": "longest",
+        "green": 6,
+        "mutants": 3,
+        "killed": 3,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/13",
+        "name": "greatest_common_divisor",
+        "green": 6,
+        "mutants": 2,
+        "killed": 2,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/14",
+        "name": "all_prefixes",
+        "green": 5,
+        "mutants": 3,
+        "killed": 3,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/15",
+        "name": "string_sequence",
+        "green": 4,
+        "mutants": 3,
+        "killed": 3,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/16",
+        "name": "count_distinct_characters",
+        "green": 6,
+        "mutants": 1,
+        "killed": 1,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/17",
+        "name": "parse_music",
+        "green": 6,
+        "mutants": 4,
+        "killed": 4,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/18",
+        "name": "how_many_times",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/19",
+        "name": "sort_numbers",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/20",
+        "name": "find_closest_elements",
+        "green": 6,
+        "mutants": 5,
+        "killed": 5,
+        "equivalent": 1
+      },
+      {
+        "task_id": "HumanEval/21",
+        "name": "rescale_to_unit",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/22",
+        "name": "filter_integers",
+        "green": 6,
+        "mutants": 1,
+        "killed": 1,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/23",
+        "name": "strlen",
+        "green": 5,
+        "mutants": 1,
+        "killed": 1,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/24",
+        "name": "largest_divisor",
+        "green": 6,
+        "mutants": 4,
+        "killed": 4,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/25",
+        "name": "factorize",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/26",
+        "name": "remove_duplicates",
+        "green": 6,
+        "mutants": 3,
+        "killed": 3,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/27",
+        "name": "flip_case",
+        "green": 6,
+        "mutants": 1,
+        "killed": 1,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/28",
+        "name": "concatenate",
+        "green": 5,
+        "mutants": 1,
+        "killed": 1,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/29",
+        "name": "filter_by_prefix",
+        "green": 6,
+        "mutants": 1,
+        "killed": 1,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/30",
+        "name": "get_positive",
+        "green": 6,
+        "mutants": 3,
+        "killed": 3,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/31",
+        "name": "is_prime",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/32",
+        "name": "find_zero",
+        "green": 6,
+        "mutants": 6,
+        "killed": 4,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/33",
+        "name": "sort_third",
+        "green": 6,
+        "mutants": 3,
+        "killed": 3,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/34",
+        "name": "unique",
+        "green": 6,
+        "mutants": 1,
+        "killed": 1,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/35",
+        "name": "max_element",
+        "green": 6,
+        "mutants": 2,
+        "killed": 2,
+        "equivalent": 1
+      },
+      {
+        "task_id": "HumanEval/36",
+        "name": "fizz_buzz",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/37",
+        "name": "sort_even",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/38",
+        "name": "decode_cyclic",
+        "green": 4,
+        "mutants": 1,
+        "killed": 1,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/39",
+        "name": "prime_fib",
+        "green": 6,
+        "mutants": 6,
+        "killed": 5,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/40",
+        "name": "triples_sum_to_zero",
+        "green": 6,
+        "mutants": 6,
+        "killed": 5,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/41",
+        "name": "car_race_collision",
+        "green": 5,
+        "mutants": 2,
+        "killed": 2,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/42",
+        "name": "incr_list",
+        "green": 5,
+        "mutants": 3,
+        "killed": 3,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/43",
+        "name": "pairs_sum_to_zero",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/44",
+        "name": "change_base",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/45",
+        "name": "triangle_area",
+        "green": 5,
+        "mutants": 4,
+        "killed": 4,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/46",
+        "name": "fib4",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/47",
+        "name": "median",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/48",
+        "name": "is_palindrome",
+        "green": 6,
+        "mutants": 6,
+        "killed": 6,
+        "equivalent": 0
+      },
+      {
+        "task_id": "HumanEval/49",
+        "name": "modp",
+        "green": 6,
+        "mutants": 5,
+        "killed": 5,
+        "equivalent": 0
+      }
+    ]
+  },
+  "tokens": {
+    "in": 80426,
+    "out": 90806
+  }
+}

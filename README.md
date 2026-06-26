@@ -6,7 +6,7 @@
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Tests](https://img.shields.io/badge/tests-145%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-204%20passing-brightgreen)
 [![CI](https://github.com/Drzymek92/ai-test-pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/Drzymek92/ai-test-pilot/actions/workflows/ci.yml)
 
 ## Overview
@@ -72,13 +72,20 @@ target is a single new file with zero changes to the core:
 - **Fail-safe by contract** — the LLM call has a timeout + exponential-backoff retry and raises
   rather than ever emit a half-generated suite; a per-test run cap bounds a hanging test; and the CLI
   has a documented **exit-code contract** (`0` ok · `1` internal · `2` usage · `3` uninspectable
-  target · `4` LLM failure · `5` quality regression · `6` budget exceeded) for scripting.
+  target · `4` LLM failure · `5` quality regression · `6` budget exceeded · `7` detection regression)
+  for scripting.
 - **Quality regression gate** — `quality` runs a curated known-good target set and reports a metric
   panel (coverage, pass-rate, false-positive rate, error rate, test-smell density, acceptance), gated
   against a stored baseline so a generation/prompt change that regresses quality fails loudly.
 - **Cost guardrails** — every run measures and records real token spend (a cache replay is free);
   opt-in `[budget]` caps abort before overspending, and `sweep` "tests the diff" by generating only
   for git-changed modules under a per-sweep cap.
+- **Proven bug detection (not just coverage)** — a `detect` command measures **mutation kill rate**
+  (generate from correct code, re-run against buggy/mutant versions, count what's caught) over an
+  external corpus (QuixBugs) + in-repo mutants, with a feature ablation and a standard-tool
+  (cosmic-ray) cross-check on held-out code. A **coverage-feedback loop** then feeds the suite's
+  uncovered lines back to the LLM to target them — the feedback mechanism single-shot LLM test-gen
+  lacks. See [Does it actually catch bugs?](#does-it-actually-catch-bugs) and `benchmark/DETECTION.md`.
 
 ## How it works
 
@@ -146,6 +153,36 @@ python scripts/main.py --adapter web_playwright --target demo/login_app/index.ht
 
 # websocket: emits page.route_web_socket mock (server push + echo) + expect_ws_message
 python scripts/main.py --adapter web_playwright --target demo/ws_app/index.html --serve
+```
+
+## Does it actually catch bugs?
+
+Coverage is a weak proxy — a suite can execute every line and assert nothing useful. The real test of
+a test generator is **kill rate**: generate a suite from *correct* code, then run it against a *buggy*
+version and count how many bugs a test that passed on the correct code now catches (standard
+mutation-testing semantics). The full reproducible eval ships in [`benchmark/`](benchmark/DETECTION.md).
+
+| Corpus | Kill rate (95% Wilson CI) | Notes |
+|---|---|---|
+| **QuixBugs** (external, default config) | **0.80** [0.584–0.919] (n=20) | human-verified correct↔buggy pairs |
+| **In-repo AST mutation** (full ablation) | **0.818** [0.523–0.949] (n=11) | controlled mutants; the "is it overengineered?" ablation substrate |
+| **HumanEval held-out — standard tool (cosmic-ray)** | **0.923** [0.906–0.937] (n=1166) | re-measured with a standard mutation tool on code never seen during development |
+
+**vs a search-based peer:** on the same QuixBugs targets and the same kill mechanic, **ours 0.80 vs
+Pynguin's 0.30** (Pynguin at a modest 30s/SIMPLE budget — a floor; even the literature's stronger SBST
+range, ~0.59–0.70, sits below 0.80). The edge is the **coverage-feedback loop** — after the first pass
+the suite's uncovered lines are fed back to the LLM to reach them — the feedback mechanism plain LLM
+test-generation lacks.
+
+**Honest framing:** that held-out number was *first* measured with this repo's own lightweight mutation
+operators (0.98) — a generalization check, **not** a PIT-style mutation score — so it's reframed and
+**re-measured with a standard tool (0.923)** for a comparable figure; cosmic-ray doesn't exclude
+equivalent mutants, so 0.923 is a conservative lower bound, and the harder, most representative number
+remains QuixBugs **0.80**. Methodology, comparables vs the literature, and re-run procedure:
+**[benchmark/DETECTION.md](benchmark/DETECTION.md)**.
+
+```bash
+python scripts/main.py detect --subset 20      # QuixBugs + in-repo mutation kill rate + feature ablation
 ```
 
 ## Tech Stack
@@ -223,14 +260,18 @@ Run as an **MCP server** (callable from any MCP client) — register it with:
 scripts/
   main.py               # CLI + run_pipeline() (the one pipeline every interface reuses)
   mcp_server.py         # MCP server (FastMCP) exposing the engine as tools
+  cli.py                # argument parsing + subcommand dispatch + the exit-code contract
+  pipeline.py           # run_pipeline() — the one pipeline every interface reuses (typed RunRequest in)
   core/                 # adapter-agnostic engine: models, generate, materialize, runner, triage,
-                        #   ledger, tuning, context, fixtures, registry, discover, promote,
-                        #   cache (P1), errors (P2 exit codes), quality (P5 gate), budget (P4 spend)
+                        #   ledger, tuning, context, fixtures, registry, discover, promote, report,
+                        #   feedback, cache, errors (exit codes), quality (gate), budget, detection
   adapters/             # python_pytest · web_playwright  (one file per target type)
   prompts/              # scenario-generation prompts + the pytest Jinja template
 config/                 # ai_test_pilot.toml (defaults) + .env.example
+benchmark/              # reproducible efficacy eval: mutation kill rate, ablation, cosmic-ray +
+                        #   Pynguin baselines, Wilson CIs, corpora loaders, DETECTION.md + artifacts
 demo/                   # signup.html · login_app/ (auth) · ws_app/ (websocket) — web adapter targets
-tests/                  # 145 unit tests
+tests/                  # 204 unit tests
 ```
 
 ## Design notes

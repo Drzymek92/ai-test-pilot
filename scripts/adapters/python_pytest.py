@@ -373,16 +373,84 @@ def _enum_members(cls: ast.ClassDef) -> list[str]:
     return out
 
 
+def _init_fields(cls: ast.ClassDef) -> list[FieldSpec] | None:
+    """A3(b): construction signature of a PLAIN class — its `__init__` params (sans self).
+
+    Returns the param FieldSpecs (so a plain class is built as `Name(...)` via the existing $type
+    grammar), or None if the class can't be reliably constructed positionally (e.g. `__init__` takes
+    only `*args` with required slots). No `__init__` → object's no-arg ctor → []. ast-only.
+    """
+    init = next((n for n in cls.body
+                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == "__init__"), None)
+    if init is None:
+        return []                                  # default object.__init__ → constructible with no args
+    a = init.args
+    allp = list(a.posonlyargs) + list(a.args)      # includes self at index 0
+    if a.vararg and len(allp) <= 1:                # only `*args` (besides self) → can't name args
+        return None
+    n_def = len(a.defaults)
+    defaulted = set(range(len(allp) - n_def, len(allp)))
+    fields: list[FieldSpec] = []
+    for i, arg in enumerate(allp):
+        if arg.arg == "self":
+            continue
+        fields.append(FieldSpec(name=arg.arg, annotation=_annotation_str(arg.annotation),
+                                has_default=i in defaulted))
+    for arg, d in zip(a.kwonlyargs, a.kw_defaults):
+        fields.append(FieldSpec(name=arg.arg, annotation=_annotation_str(arg.annotation),
+                                has_default=d is not None))
+    return fields
+
+
+def _duck_attrs(fn: ast.FunctionDef | ast.AsyncFunctionDef, param: str) -> list[str]:
+    """A3(a): attributes the body reads off `param` (`param.x`) — its inferred duck shape."""
+    attrs: set[str] = set()
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id == param:
+            attrs.add(node.attr)
+    return sorted(attrs)
+
+
+def _ctor_hint(tree: ast.Module, type_name: str) -> str | None:
+    """A3(b) caller-scan: how `type_name` is CONSTRUCTED in this module — `Name(value=, n=)`.
+
+    A lite, same-module call-graph scan: surfaces the kwargs/positional arity callers actually pass,
+    as a prompt hint so the model builds a realistic instance (not a structurally-valid-but-empty one).
+    """
+    kwargs: set[str] = set()
+    max_pos = 0
+    found = False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and _name_of(node.func) == type_name:
+            found = True
+            kwargs.update(kw.arg for kw in node.keywords if kw.arg)
+            max_pos = max(max_pos, len(node.args))
+    if not found:
+        return None
+    parts = [f"{k}=" for k in sorted(kwargs)]
+    if max_pos:
+        parts.insert(0, f"{max_pos} positional")
+    return f"{type_name}({', '.join(parts)})" if parts else f"{type_name}()"
+
+
 def resolve_type(name: str, project_root: Path, importing_module: Path,
-                 *, types: dict[str, TypeSpec], seen: set[str], depth: int = 0) -> None:
+                 *, types: dict[str, TypeSpec], seen: set[str],
+                 builders: dict[str, str] | None = None, depth: int = 0) -> None:
     """Resolve `name` (used in `importing_module`) into a TypeSpec, recursing into fields.
 
-    ast-only (never imports the target's project). Adds to `types`; leaves a name OUT of
-    `types` when it can't be resolved (third-party / attrs / dynamic) so it stays 'complex'.
+    Strategy order (A3): user `builder` (config override) → structured (dataclass/pydantic/enum/
+    attrs/namedtuple) → plain-class `initclass` (build via `__init__`). A name left OUT of `types`
+    here is handled by the duck-typing post-pass in `introspect` (or finally stays 'complex').
+    ast-only (never imports the target's project).
     """
     if name in types or name in seen or depth > 5:
         return
     seen.add(name)
+
+    if builders and name in builders:              # A3(c): explicit user builder wins outright
+        types[name] = TypeSpec(name=name, kind="builder", module="", builder=builders[name])
+        return
+
     cls = _find_classdef(_parse_module(str(importing_module)), name)   # defined locally?
     if cls is not None:
         def_path, def_module = importing_module, resolve_import(importing_module)[1]
@@ -391,7 +459,7 @@ def resolve_type(name: str, project_root: Path, importing_module: Path,
         if not dotted:
             return
         def_path = _module_to_path(dotted, project_root)
-        if def_path is None:                       # third-party / unresolvable in this project
+        if def_path is None:                       # third-party / unresolvable → leave for duck pass
             return
         cls = _find_classdef(_parse_module(str(def_path)), name)
         if cls is None:
@@ -399,22 +467,29 @@ def resolve_type(name: str, project_root: Path, importing_module: Path,
         def_module = dotted
 
     kind = _classify(cls)
-    if kind is None:
-        return
     if kind == "enum":
         types[name] = TypeSpec(name=name, kind="enum", module=def_module,
                                enum_members=_enum_members(cls))
         return
-    fields = _extract_fields(cls)
-    types[name] = TypeSpec(name=name, kind=kind, module=def_module, fields=fields)
+    if kind is None:                               # A3(b): plain class → construct via __init__
+        init_fields = _init_fields(cls)
+        if init_fields is None:                    # not reliably constructible → leave for duck pass
+            return
+        types[name] = TypeSpec(name=name, kind="initclass", module=def_module, fields=init_fields,
+                               usage_hint=_ctor_hint(_parse_module(str(def_path)), name))
+        fields = init_fields
+    else:
+        fields = _extract_fields(cls)
+        types[name] = TypeSpec(name=name, kind=kind, module=def_module, fields=fields)
     for f in fields:                               # recurse into nested project types
         if f.annotation:
             for ident in _type_identifiers(f.annotation):
-                resolve_type(ident, project_root, def_path, types=types, seen=seen, depth=depth + 1)
+                resolve_type(ident, project_root, def_path, types=types, seen=seen,
+                             builders=builders, depth=depth + 1)
 
 
 # ── adapter surface ──────────────────────────────────────────────────────────
-def introspect(ref: TargetRef) -> TargetContract:
+def introspect(ref: TargetRef, *, builders: dict[str, str] | None = None) -> TargetContract:
     path = Path(ref.locator)
     if not path.is_file():
         raise FileNotFoundError(f"Target module not found: {path}")
@@ -423,6 +498,7 @@ def introspect(ref: TargetRef) -> TargetContract:
     wanted = {s.strip() for s in ref.selector.split(",")} if ref.selector else None
 
     units: list[UnitSpec] = []
+    fn_by_name: dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = {}
     for node in tree.body:                       # top-level functions only (M1)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if wanted is not None and node.name not in wanted:
@@ -430,6 +506,7 @@ def introspect(ref: TargetRef) -> TargetContract:
             u = _unit_from_fn(node)
             u.source = _unit_source(src, node)   # P3a: CUT context for specific-behaviour assertions
             units.append(u)
+            fn_by_name[node.name] = node
 
     if not units:
         scope = f" matching {sorted(wanted)}" if wanted else ""
@@ -437,21 +514,53 @@ def introspect(ref: TargetRef) -> TargetContract:
 
     root, module = resolve_import(path)
 
-    # Resolve the closure of constructible types referenced by any unit's params.
+    # Resolve the closure of constructible types referenced by any unit's params:
+    # builder override → structured → plain-class initclass (A3).
     types: dict[str, TypeSpec] = {}
     seen: set[str] = set()
     for u in units:
         for p in u.params:
             if p.annotation:
                 for ident in _type_identifiers(p.annotation):
-                    resolve_type(ident, root, path, types=types, seen=seen)
+                    resolve_type(ident, root, path, types=types, seen=seen, builders=builders)
 
-    # A param is "complex/unsupported" ONLY if it names a type we could not resolve.
+    # A3(a) duck-typing post-pass: any param type STILL unresolved (third-party / opaque / no usable
+    # __init__) becomes a SimpleNamespace stand-in carrying exactly the attributes the body reads.
+    for u in units:
+        fn = fn_by_name[u.name]
+        for p in u.params:
+            if not p.annotation:
+                continue
+            for ident in _type_identifiers(p.annotation):
+                if ident in types or not _is_duckable(ident):
+                    continue
+                attrs = _duck_attrs(fn, p.name)
+                if not attrs:
+                    continue                       # no observed shape → stay 'complex' (honest, avoids
+                                                   # a meaningless empty SimpleNamespace — H4 guard)
+                types[ident] = TypeSpec(
+                    name=ident, kind="duck", module="",
+                    fields=[FieldSpec(name=a, has_default=True) for a in attrs],
+                    usage_hint=_ctor_hint(tree, ident))
+
+    # A param is "complex/unsupported" ONLY if it still names a type no strategy could build.
     for u in units:
         u.complex_params = [f"{p.name}: {p.annotation}" for p in u.params
                             if p.annotation and _unresolved_idents(p.annotation, types)]
 
     return TargetContract(ref=ref, module=module, units=units, types=types)
+
+
+# Typing/callable constructs a SimpleNamespace stand-in can't honestly model (not callable / iterable).
+_NON_DUCK = frozenset({
+    "Callable", "Iterator", "Generator", "AsyncIterator", "AsyncGenerator",
+    "Awaitable", "Coroutine", "Type", "Protocol", "Annotated", "TypeVar",
+})
+
+
+def _is_duckable(ident: str) -> bool:
+    """A name worth a SimpleNamespace stand-in — a real class name, not a typing/callable construct."""
+    return ident not in _NON_DUCK and (ident[:1].isupper() or ident.startswith("_"))
 
 
 def _slug(value: str) -> str:
@@ -487,17 +596,26 @@ def file_header(contract: TargetContract, scenarios=()) -> str:
             _collect_symbols(v, types_used, calls_used, enums_used)
 
     by_module: dict[str, set[str]] = {}
+    need_simplenamespace = False
     for nm in types_used | enums_used:               # project types/enums → their source module
         ts = contract.types.get(nm)
-        if ts:
+        if not ts:
+            continue
+        if ts.kind == "duck":                        # A3(a): SimpleNamespace stand-in (synthesized)
+            need_simplenamespace = True
+        elif ts.kind == "builder" and ts.builder:    # A3(c): import the user builder function
+            mod, _, func = ts.builder.partition(":")
+            by_module.setdefault(mod, set()).add(func)
+        else:                                        # structured / initclass → import the real type
             by_module.setdefault(ts.module, set()).add(nm)
     for nm in calls_used:                            # scalar ctors → stdlib module
         mod = _SCALAR_IMPORTS.get(nm)
         if mod:
             by_module.setdefault(mod, set()).add(nm)
 
-    extra = "".join(f"from {mod} import {', '.join(sorted(names))}\n"
-                    for mod, names in sorted(by_module.items()))
+    extra = ("from types import SimpleNamespace\n" if need_simplenamespace else "")
+    extra += "".join(f"from {mod} import {', '.join(sorted(names))}\n"
+                     for mod, names in sorted(by_module.items()))
 
     return (
         '"""Generated by AI Test Pilot — REVIEW before promoting into a real suite.\n'
@@ -536,30 +654,49 @@ def _render_setup(scenario: TestScenario) -> str:
     return "\n".join(lines)
 
 
-def _render_value(node) -> str:
+def _type_callable(ts: TypeSpec) -> str:
+    """The Python callable a `$type` renders to: duck → SimpleNamespace, builder → its function,
+    everything else (structured / initclass) → the type's own name."""
+    if ts.kind == "duck":
+        return "SimpleNamespace"
+    if ts.kind == "builder" and ts.builder:
+        return ts.builder.split(":")[-1]
+    return ts.name
+
+
+def _render_map(contract: TargetContract) -> dict[str, str]:
+    """$type name → the callable to emit for it (A3: duck/builder redirect; others are identity)."""
+    return {n: _type_callable(t) for n, t in contract.types.items()}
+
+
+def _render_value(node, render: dict[str, str] | None = None) -> str:
     """Render one input value-grammar node to a Python expression (recursive).
 
-    Nodes: a JSON primitive (repr) · {"$type": T, "args": {...}} → T(...) ·
+    Nodes: a JSON primitive (repr) · {"$type": T, "args": {...}} → callable_for(T)(...) ·
     {"$call": F, "args": [...] | {...}} → F(...) (scalar ctors) ·
     {"$enum": "E.MEMBER"} → literal · JSON list/dict → rendered recursively.
+
+    `render` maps a $type name to the callable to emit (A3): a `duck` type renders to
+    `SimpleNamespace(...)`, a `builder` type to its builder function, others to the type name itself.
     """
     if isinstance(node, dict):
         if "$type" in node:
             args = node.get("args") or {}
-            inner = ", ".join(f"{k}={_render_value(v)}" for k, v in args.items())
-            return f"{node['$type']}({inner})"
+            inner = ", ".join(f"{k}={_render_value(v, render)}" for k, v in args.items())
+            sym = (render or {}).get(node["$type"], node["$type"])
+            return f"{sym}({inner})"
         if "$call" in node:
             args = node.get("args") or []
             if isinstance(args, dict):
-                inner = ", ".join(f"{k}={_render_value(v)}" for k, v in args.items())
+                inner = ", ".join(f"{k}={_render_value(v, render)}" for k, v in args.items())
             else:
-                inner = ", ".join(_render_value(a) for a in args)
+                inner = ", ".join(_render_value(a, render) for a in args)
             return f"{node['$call']}({inner})"
         if "$enum" in node:
             return str(node["$enum"])
-        return "{" + ", ".join(f"{k!r}: {_render_value(v)}" for k, v in node.items()) + "}"
+        return "{" + ", ".join(f"{k!r}: {_render_value(v, render)}" for k, v in node.items()) + "}"
     if isinstance(node, list):
-        return "[" + ", ".join(_render_value(v) for v in node) + "]"
+        return "[" + ", ".join(_render_value(v, render) for v in node) + "]"
     return repr(node)
 
 
@@ -657,7 +794,7 @@ def _collect_symbols(node, types_used: set, calls_used: set, enums_used: set) ->
             _collect_symbols(v, types_used, calls_used, enums_used)
 
 
-def _render_call(scenario: TestScenario) -> str:
+def _render_call(scenario: TestScenario, render: dict[str, str] | None = None) -> str:
     """The function call expression, with tmp-file params bound to their created paths."""
     # Bind tmp-file params to the created Path OBJECT (not str): a Path is compatible
     # with both `Path`-only signatures (which call .read_text/.read_bytes) and `str|Path`
@@ -665,7 +802,7 @@ def _render_call(scenario: TestScenario) -> str:
     tmp_params = {tf.param for tf in scenario.tmp_files}
     parts: list[str] = []
     for k, v in scenario.inputs.items():
-        parts.append(f"{k}={_tmp_var(k)}" if k in tmp_params else f"{k}={_render_value(v)}")
+        parts.append(f"{k}={_tmp_var(k)}" if k in tmp_params else f"{k}={_render_value(v, render)}")
     for tf in scenario.tmp_files:                    # tmp params not also in inputs
         if tf.param not in scenario.inputs:
             parts.append(f"{tf.param}={_tmp_var(tf.param)}")
@@ -682,7 +819,7 @@ def emit(scenario: TestScenario, contract: TargetContract) -> str:
         s=scenario,
         doc=_docstring(scenario),
         setup=_render_setup(scenario),
-        call=_render_call(scenario),
+        call=_render_call(scenario, _render_map(contract)),
         func_args=func_args,
         module=contract.module,
     )
@@ -696,9 +833,10 @@ def probe_source(contract: TargetContract, scenarios: list[TestScenario]) -> str
     """
     for s in scenarios:                              # safety net before any code is emitted/executed
         validate_scenario(s, contract)
+    render = _render_map(contract)
     lines = [file_header(contract, scenarios), "import json as _aitp_json", ""]
     for s in scenarios:
-        call = _render_call(s)
+        call = _render_call(s, render)
         lines += [
             "try:",
             f"    _r = {call}",

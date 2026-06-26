@@ -66,6 +66,7 @@ def test_generate_scenarios_repairs_then_succeeds(monkeypatch):
 
 
 def test_generate_scenarios_exhausts_retries(monkeypatch):
+    from scripts.core.errors import LLMError
     monkeypatch.setattr(generate, "llm_call", lambda *a, **k: "still not json")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(LLMError):     # parse-exhaustion = clean exit-4 LLMError, caught by detection/sweep
         generate.generate_scenarios(_contract(), repair_retries=1)

@@ -1,0 +1,23 @@
+# Curated KNOWN-GOOD target set for the `quality` gate (P5). Keep it small (3-5) — every target
+# costs at most one generation per model/prompt change (cached otherwise, per P1). Paths are
+# relative to the project root; a missing path is SKIPPED with a note (so the portfolio copy, which
+# lacks sibling projects, still runs the in-repo synthetic). `grep` selects the source file whose
+# line coverage is measured.
+
+[[target]]
+name     = "synthetic_typed"     # in-repo; always present — P3a (no-docstring) + P3b (constrained/NamedTuple)
+path     = "benchmark/fixtures/quality_sample.py"
+selector = "line_total,clamp_qty,split_codes"
+grep     = "quality_sample"
+
+[[target]]
+name     = "librarian_extractors"   # no-docstring pure helpers — the original dogfood target (P3a)
+path     = "../librarian/scripts/extract/extractors.py"
+selector = "_chunk_text,_flatten_json"
+grep     = "extractors"
+
+[[target]]
+name     = "marketplace_commission"  # typed business-rules engine (pydantic/Decimal) — P3b shapes
+path     = "../marketplace-cx-agent/scripts/rules/commission.py"
+selector = "compute_commission"
+grep     = "commission"

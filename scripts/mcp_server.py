@@ -10,15 +10,14 @@ Human-in-the-loop boundary: tools write to `scripts/outputs/` ONLY — never int
 stdout is reserved for the JSON-RPC transport; the shared logger writes to stderr, and tool bodies
 run under a stdout→stderr redirect so a stray print can't corrupt the protocol stream.
 
-Register in an MCP client (e.g. Claude Code, settings → MCP servers):
+Register in Claude Code (settings → MCP servers):
   "ai-test-pilot": {
     "command": "python",
-    "args": ["/path/to/ai-test-pilot/scripts/mcp_server.py"]
+    "args": ["C:\\\\...\\\\projects\\\\ai-test-pilot\\\\scripts\\\\mcp_server.py"]
   }
 """
 from __future__ import annotations
 
-import argparse
 import contextlib
 import sys
 from pathlib import Path
@@ -30,7 +29,7 @@ from mcp.server.fastmcp import FastMCP
 
 from scripts.config import load_config
 from scripts.core import ledger, registry
-from scripts.core.models import TargetRef
+from scripts.core.models import RunRequest, TargetRef
 from scripts.logger import get_logger
 
 logger = get_logger("mcp_server")
@@ -74,16 +73,14 @@ def generate_tests(target: str, adapter: str = "", selector: str = "", count: in
     pytest files into scripts/outputs/ (never the target repo). `golden` locks assertions to real
     results; `fixtures`+`fixture_domain` seed inputs from synthetic-data-factory."""
     with _quiet():
-        from scripts.main import run_pipeline
+        from scripts.pipeline import run_pipeline
         cfg = load_config(None)
-        args = argparse.Namespace(
+        req = RunRequest(
             target=target, adapter=adapter or None, selector=selector or None,
-            count=count or None, model=None, prompt_version=None, no_run=False,
-            fixtures=fixtures, fixture_domain=fixture_domain or None, fixture_entity=None,
-            fixture_rows=None, context=None, no_context=no_context, golden=golden,
-            no_cache=False, refresh_cache=False, no_cut_source=False,
+            count=count or None, fixtures=fixtures, fixture_domain=fixture_domain or None,
+            no_context=no_context, golden=golden,
         )
-        r = run_pipeline(cfg, args)
+        r = run_pipeline(cfg, req)
         lines = [
             f"run {r.run_id}: {r.passed} passed / {r.failed} failed / {r.errored} error "
             f"of {r.generated} generated",

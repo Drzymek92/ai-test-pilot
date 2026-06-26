@@ -1,0 +1,23 @@
+# Curated KNOWN-GOOD targets for the mutation half of the bug-detection eval.
+# For each target we AST-mutate the source (benchmark/mutation.py), generate a suite from the
+# CORRECT version, then measure how many mutants the suite KILLS — under each ablation variant.
+# Keep it small (the ablation multiplies cost: targets x variants x one generation each; re-runs are
+# ~free via the P1 cache). Paths are relative to the project root; a missing path is SKIPPED with a
+# note (so the portfolio copy, lacking sibling projects, still runs the in-repo synthetic). The
+# source files are NEVER mutated in place — each case works on a temp copy.
+
+[[target]]
+name     = "synthetic_typed"     # in-repo; always present — pure, deterministic, mutation-rich
+path     = "benchmark/fixtures/quality_sample.py"
+selector = "line_total,clamp_qty,split_codes"
+
+[[target]]
+name     = "librarian_extractors"   # no-docstring pure helpers — the original dogfood target
+path     = "../librarian/scripts/extract/extractors.py"
+selector = "_chunk_text,_flatten_json"
+
+# NOTE: targets whose functions take UNCONSTRUCTABLE typed args (e.g. marketplace_commission's
+# compute_commission(order: OrderView, config: RulesConfig)) are intentionally OUT of the mutation
+# corpus — the tool can't generate a runnable suite for them (green baseline = 0), so their mutants
+# are unkillable by a GENERATION limit, not a detection miss, and would only waste a generation each
+# run. That typed-input limitation is the quality gate's / LIMITATIONS' concern, not kill rate's.

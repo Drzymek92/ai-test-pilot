@@ -80,8 +80,8 @@ def test_run_quality_orchestration(tmp_path: Path, monkeypatch):
         adapter, test_file = "python_pytest", str(gen_test)
         generated, passed, failed, errored = 4, 3, 1, 0
 
-    import scripts.main as main_mod
-    monkeypatch.setattr(main_mod, "run_pipeline", lambda cfg, ns: _Rep())
+    import scripts.pipeline as pipeline_mod
+    monkeypatch.setattr(pipeline_mod, "run_pipeline", lambda cfg, ns: _Rep())
     monkeypatch.setattr(quality, "_coverage", lambda *a, **k: 88.0)
     monkeypatch.setattr(quality.ledger_mod, "target_acceptance", lambda *a, **k: None)
 

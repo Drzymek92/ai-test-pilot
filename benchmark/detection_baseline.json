@@ -1,0 +1,11 @@
+{
+  "ts": "2026-06-25T09:10:01",
+  "model": "gemini-3.1-pro",
+  "panel": {
+    "quixbugs_kill_rate": 0.8,
+    "mutation_kill_rate_naive": 0.636,
+    "mutation_kill_rate_cut_source": 0.818,
+    "mutation_kill_rate_golden": 0.818,
+    "mutation_kill_rate_full": 0.818
+  }
+}

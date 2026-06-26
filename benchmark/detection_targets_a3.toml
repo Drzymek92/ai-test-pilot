@@ -1,0 +1,17 @@
+# Approach-3 detection manifest — plain-class typed targets (the A3 init-class unlock).
+# These params (Order, Money, TreeNode) are PLAIN classes: pre-A3 they were warn-and-skip (green=0),
+# so the suite could catch no bug. With A3 the tool constructs them via __init__ (nested), so mutation
+# kill rate becomes measurable. Run:
+#   python scripts/main.py detect --corpus mutation --manifest benchmark/detection_targets_a3.toml
+#   (add --feedback to also stack Approach 1; re-runs are ~free via the P1 cache)
+# This is a SEPARATE corpus — do NOT fold its numbers into detection_baseline.json / EVAL_DETECTION.md.
+
+[[target]]
+name     = "a3_order_math"        # nested plain classes Order(items=[Money...], shipping=Money)
+path     = "benchmark/fixtures/a3_typed_sample.py"
+selector = "grand_total,qualifies_free_shipping,heaviest_item"
+
+[[target]]
+name     = "a3_tree"             # recursive plain-class TreeNode graph
+path     = "benchmark/fixtures/a3_typed_sample.py"
+selector = "sum_tree,max_depth"

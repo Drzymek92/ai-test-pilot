@@ -2,7 +2,7 @@
 
 Deterministic scaffolding around a single LLM call: build a prompt from the
 introspection contract, call the gateway, then parse + validate the response into a
-schema-checked ScenarioSet. Invalid JSON or schema violations trigger one repair retry.
+schema-checked ScenarioSet. Invalid JSON or schema violations trigger one repair retry
 The LLM only ever returns JSON — code is rendered later.
 """
 from __future__ import annotations
@@ -14,6 +14,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from scripts.core import cache as scenario_cache
+from scripts.core.errors import LLMError
 from scripts.core.models import ScenarioSet, TargetContract, TestScenario
 from scripts.llm_client import llm_call, resolve_model
 from scripts.logger import get_logger
@@ -71,26 +72,44 @@ def _contract_block(contract: TargetContract, *, include_source: bool = True,
 
     if contract.types:
         lines.append("## Constructible types (build these with the $type grammar — NOT plain dicts)")
-        has_constraints = False
+        has_constraints = has_duck = False
         for t in contract.types.values():
             if t.kind == "enum":
                 lines.append(f"- enum {t.name}: members {', '.join(t.enum_members)} "
                              f'(use {{"$enum": "{t.name}.<MEMBER>"}})')
-            else:
-                parts = []
-                for f in t.fields:
-                    seg = f"{f.name}: {f.annotation}"
-                    if f.constraint:                      # P3b-2: respect the value constraints
-                        seg += f" [{f.constraint}]"
-                        has_constraints = True
-                    if f.has_default:
-                        seg += " =default"
-                    parts.append(seg)
-                lines.append(f"- {t.kind} {t.name}({', '.join(parts)})")
+                continue
+            if t.kind == "duck":                          # A3(a): SimpleNamespace stand-in
+                attrs = ", ".join(f.name for f in t.fields) or "(no attributes read)"
+                lines.append(f"- stand-in {t.name}({attrs}) — opaque type; build it with "
+                             f'{{"$type": "{t.name}", "args": {{...}}}} supplying ONLY the attributes '
+                             "the code under test reads (listed). Nest $type for nested objects.")
+                has_duck = True
+                continue
+            parts = []
+            for f in t.fields:
+                seg = f"{f.name}: {f.annotation or 'Any'}"
+                if f.constraint:                          # P3b-2: respect the value constraints
+                    seg += f" [{f.constraint}]"
+                    has_constraints = True
+                if f.has_default:
+                    seg += " =default"
+                parts.append(seg)
+            label = {"builder": "built-by-builder", "initclass": "class"}.get(t.kind, t.kind)
+            line = f"- {label} {t.name}({', '.join(parts)})"
+            if t.kind == "builder":                       # A3(c): user-provided builder
+                line += "  — pass the builder's arguments as the $type args."
+            elif t.usage_hint:                            # A3(b): caller-construction hint
+                line += f"  — callers construct it as: {t.usage_hint}"
+            lines.append(line)
         if has_constraints:
             lines.append("  NOTE: fields in [brackets] carry constraints (e.g. [gt=0] = strictly "
                          "greater than 0, [min_length=1] = non-empty) — choose values that SATISFY "
                          "them, or the object fails to construct.")
+        if has_duck:
+            lines.append("  NOTE: a 'stand-in' is a best-effort lightweight object (SimpleNamespace) — it "
+                         "has only the attributes you set. Give the code what it needs to run; when the "
+                         "exact computed result is uncertain, assert invariants and tag the scenario "
+                         "'uncertain' rather than guessing.")
         lines.append("")
     return "\n".join(lines)
 
@@ -145,6 +164,7 @@ def generate_scenarios(
     fixture_block: str = "",
     context_block: str = "",
     fewshot_block: str = "",
+    feedback_block: str = "",
     cache_dir: Path | None = None,
     use_cache: bool = False,
     refresh_cache: bool = False,
@@ -166,6 +186,7 @@ def generate_scenarios(
         f"{context_block}"
         f"{fixture_block}"
         f"{fewshot_block}"
+        f"{feedback_block}"
         f"Return ONLY the JSON array."
     )
 
@@ -222,6 +243,9 @@ def generate_scenarios(
                 f"Return ONLY a valid JSON array matching the schema."
             )
 
-    raise RuntimeError(
+    # The model never produced schema-valid JSON within the retries → a clean LLMError (exit 4),
+    # never a half-generated suite. The detection/sweep harnesses catch this and skip-with-reason
+    # so one unparseable target can't crash a whole eval.
+    raise LLMError(
         f"Scenario generation failed after {repair_retries + 1} attempt(s): {last_err}"
     )

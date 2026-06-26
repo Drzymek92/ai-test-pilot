@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from scripts.adapters import python_pytest as adapter
-from scripts.config import load_config
+from scripts.config import RunCfg, autoscale_count, load_config
 from scripts.core import runner
 from scripts.core.fixtures import FixtureBundle, _pick_output, bind_fixture_files, prompt_block
 from scripts.core.models import ScenarioSet, TargetRef, TestScenario, TmpFile
@@ -14,6 +14,29 @@ _JUNIT = """<?xml version="1.0" encoding="utf-8"?>
   <testcase classname="t" name="test_fail"><failure type="AssertionError" message="boom"/></testcase>
   <testcase classname="t" name="test_err"><error type="ImportError" message="no mod"/></testcase>
 </testsuite></testsuites>"""
+
+
+def test_autoscale_count_scales_with_units():
+    run = RunCfg()                                    # defaults: floor 6, per_unit 3, max 30
+    assert autoscale_count(run, 1) == 6               # 1-2 units stay at the floor (preserves QuixBugs)
+    assert autoscale_count(run, 2) == 6
+    assert autoscale_count(run, 3) == 9               # 3 units -> 9
+    assert autoscale_count(run, 5) == 15
+    assert autoscale_count(run, 10) == 30             # capped at scenario_max
+    assert autoscale_count(run, 20) == 30
+
+
+def test_autoscale_count_override_and_disable():
+    run = RunCfg()
+    assert autoscale_count(run, 10, override=4) == 4   # explicit --count always wins
+    off = RunCfg(scenarios_per_unit=0)
+    assert autoscale_count(off, 10) == 6               # disabled -> fixed scenario_count
+
+
+def test_config_defaults_autoscale():
+    cfg = load_config()
+    assert cfg.run.scenarios_per_unit == 3
+    assert cfg.run.scenario_max == 30
 
 
 def test_parse_junit(tmp_path: Path):

@@ -12,7 +12,6 @@ gate reuses `commons/evals/regression.py`.
 """
 from __future__ import annotations
 
-import argparse
 import ast
 import json
 import shutil
@@ -24,6 +23,7 @@ from pathlib import Path
 
 from scripts.config import AppConfig
 from scripts.core import ledger as ledger_mod
+from scripts.core.models import RunRequest
 from scripts.llm_client import resolve_model
 from scripts.logger import get_logger
 
@@ -138,20 +138,14 @@ def panel_regressions(baseline: dict, current: dict, *, tol: float = 0.0) -> dic
 
 
 # ── orchestration ─────────────────────────────────────────────────────────────
-def _ns(target: dict, cfg: AppConfig) -> argparse.Namespace:
-    """A complete run_pipeline args namespace for a curated target (cache ON → cheap re-runs)."""
-    return argparse.Namespace(
-        target=target["abs_path"], adapter=None, selector=target.get("selector"),
-        count=None, model=None, prompt_version=None, no_run=False,
-        fixtures=False, fixture_domain=None, fixture_entity=None, fixture_rows=None,
-        context=None, no_context=False, golden=False, serve=False, web_async=False,
-        no_cache=False, refresh_cache=False, no_cut_source=False,
-    )
+def _req(target: dict, cfg: AppConfig) -> RunRequest:
+    """A run_pipeline RunRequest for a curated target (cache ON → cheap re-runs)."""
+    return RunRequest(target=target["abs_path"], selector=target.get("selector"))
 
 
 def run_quality(cfg: AppConfig, project_root: Path, *, manifest: Path | None = None,
                 update_baseline: bool = False, tol: float = 0.0) -> dict:
-    from scripts.main import run_pipeline                  # lazy: avoid import cycle
+    from scripts.pipeline import run_pipeline              # lazy: avoid import cycle
 
     manifest = manifest or project_root / "benchmark" / "quality_targets.toml"
     baseline_path = project_root / "benchmark" / "quality_baseline.json"
@@ -167,7 +161,7 @@ def run_quality(cfg: AppConfig, project_root: Path, *, manifest: Path | None = N
     covs: list[float] = []
     accepts: list[float] = []
     for t in targets:
-        rep = run_pipeline(cfg, _ns(t, cfg))
+        rep = run_pipeline(cfg, _req(t, cfg))
         sm = smell_report(Path(rep.test_file))
         cov = _coverage(rep.test_file, project_root, t["grep"], cover_dir)
         acc = ledger_mod.target_acceptance(rep.adapter, t["abs_path"], ledger_path)

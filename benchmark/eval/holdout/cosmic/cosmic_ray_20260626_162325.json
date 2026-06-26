@@ -1,0 +1,1868 @@
+{
+  "ts": "2026-06-26T16:23:25",
+  "tool": "cosmic-ray",
+  "tool_version": "unknown",
+  "model": "gemini-3.1-pro",
+  "corpus": "humaneval",
+  "subset": 50,
+  "problems": 50,
+  "problems_scored": 39,
+  "function_scope": {
+    "killed": 1076,
+    "mutants": 1166,
+    "incompetent": 0,
+    "kill_rate": 0.923
+  },
+  "module_scope": {
+    "killed": 1234,
+    "mutants": 1362,
+    "incompetent": 0,
+    "kill_rate": 0.906
+  },
+  "operators": {
+    "core/NumberReplacer": 208,
+    "core/AddNot": 37,
+    "core/ZeroIterationForLoop": 26,
+    "core/ReplaceBinaryOperator_Add_Sub": 21,
+    "core/ReplaceBinaryOperator_Add_Mul": 21,
+    "core/ReplaceBinaryOperator_Add_Div": 21,
+    "core/ReplaceBinaryOperator_Add_FloorDiv": 21,
+    "core/ReplaceBinaryOperator_Add_Mod": 21,
+    "core/ReplaceBinaryOperator_Add_Pow": 21,
+    "core/ReplaceBinaryOperator_Add_RShift": 21,
+    "core/ReplaceBinaryOperator_Add_LShift": 21,
+    "core/ReplaceBinaryOperator_Add_BitOr": 21,
+    "core/ReplaceBinaryOperator_Add_BitAnd": 21,
+    "core/ReplaceBinaryOperator_Add_BitXor": 21,
+    "core/ReplaceComparisonOperator_Eq_NotEq": 15,
+    "core/ReplaceComparisonOperator_Eq_Lt": 15,
+    "core/ReplaceComparisonOperator_Eq_LtE": 15,
+    "core/ReplaceComparisonOperator_Eq_Gt": 15,
+    "core/ReplaceComparisonOperator_Eq_GtE": 15,
+    "core/ReplaceUnaryOperator_USub_UAdd": 14,
+    "core/ReplaceUnaryOperator_USub_Invert": 14,
+    "core/ReplaceUnaryOperator_USub_Not": 14,
+    "core/ReplaceUnaryOperator_Delete_USub": 14,
+    "core/ReplaceBinaryOperator_Sub_Add": 12,
+    "core/ReplaceBinaryOperator_Sub_Mul": 12,
+    "core/ReplaceBinaryOperator_Sub_Div": 12,
+    "core/ReplaceBinaryOperator_Sub_FloorDiv": 12,
+    "core/ReplaceBinaryOperator_Sub_Mod": 12,
+    "core/ReplaceBinaryOperator_Sub_Pow": 12,
+    "core/ReplaceBinaryOperator_Sub_RShift": 12,
+    "core/ReplaceBinaryOperator_Sub_LShift": 12,
+    "core/ReplaceBinaryOperator_Sub_BitOr": 12,
+    "core/ReplaceBinaryOperator_Sub_BitAnd": 12,
+    "core/ReplaceBinaryOperator_Sub_BitXor": 12,
+    "core/ReplaceBinaryOperator_Mod_Add": 10,
+    "core/ReplaceBinaryOperator_Mod_Sub": 10,
+    "core/ReplaceBinaryOperator_Mod_Mul": 10,
+    "core/ReplaceBinaryOperator_Mod_Div": 10,
+    "core/ReplaceBinaryOperator_Mod_FloorDiv": 10,
+    "core/ReplaceBinaryOperator_Mod_Pow": 10,
+    "core/ReplaceBinaryOperator_Mod_RShift": 10,
+    "core/ReplaceBinaryOperator_Mod_LShift": 10,
+    "core/ReplaceBinaryOperator_Mod_BitOr": 10,
+    "core/ReplaceBinaryOperator_Mod_BitAnd": 10,
+    "core/ReplaceBinaryOperator_Mod_BitXor": 10,
+    "core/ReplaceComparisonOperator_Gt_Eq": 8,
+    "core/ReplaceComparisonOperator_Gt_NotEq": 8,
+    "core/ReplaceComparisonOperator_Gt_Lt": 8,
+    "core/ReplaceComparisonOperator_Gt_LtE": 8,
+    "core/ReplaceComparisonOperator_Gt_GtE": 8,
+    "core/ReplaceTrueWithFalse": 7,
+    "core/ReplaceFalseWithTrue": 7,
+    "core/ReplaceBinaryOperator_Div_Add": 6,
+    "core/ReplaceBinaryOperator_Div_Sub": 6,
+    "core/ReplaceBinaryOperator_Div_Mul": 6,
+    "core/ReplaceBinaryOperator_Div_FloorDiv": 6,
+    "core/ReplaceBinaryOperator_Div_Mod": 6,
+    "core/ReplaceBinaryOperator_Div_Pow": 6,
+    "core/ReplaceBinaryOperator_Div_RShift": 6,
+    "core/ReplaceBinaryOperator_Div_LShift": 6,
+    "core/ReplaceBinaryOperator_Div_BitOr": 6,
+    "core/ReplaceBinaryOperator_Div_BitAnd": 6,
+    "core/ReplaceBinaryOperator_Div_BitXor": 6,
+    "core/ReplaceComparisonOperator_Lt_Eq": 5,
+    "core/ReplaceComparisonOperator_Lt_NotEq": 5,
+    "core/ReplaceComparisonOperator_Lt_LtE": 5,
+    "core/ReplaceComparisonOperator_Lt_Gt": 5,
+    "core/ReplaceComparisonOperator_Lt_GtE": 5,
+    "core/ReplaceComparisonOperator_Eq_Is": 5,
+    "core/ReplaceComparisonOperator_Eq_IsNot": 5,
+    "core/ReplaceUnaryOperator_Delete_Not": 4,
+    "core/ReplaceBinaryOperator_Mul_Add": 4,
+    "core/ReplaceBinaryOperator_Mul_Sub": 4,
+    "core/ReplaceBinaryOperator_Mul_Div": 4,
+    "core/ReplaceBinaryOperator_Mul_FloorDiv": 4,
+    "core/ReplaceBinaryOperator_Mul_Mod": 4,
+    "core/ReplaceBinaryOperator_Mul_Pow": 4,
+    "core/ReplaceBinaryOperator_Mul_RShift": 4,
+    "core/ReplaceBinaryOperator_Mul_LShift": 4,
+    "core/ReplaceBinaryOperator_Mul_BitOr": 4,
+    "core/ReplaceBinaryOperator_Mul_BitAnd": 4,
+    "core/ReplaceBinaryOperator_Mul_BitXor": 4,
+    "core/ReplaceComparisonOperator_NotEq_Eq": 3,
+    "core/ReplaceComparisonOperator_NotEq_Lt": 3,
+    "core/ReplaceComparisonOperator_NotEq_LtE": 3,
+    "core/ReplaceComparisonOperator_NotEq_Gt": 3,
+    "core/ReplaceComparisonOperator_NotEq_GtE": 3,
+    "core/ReplaceComparisonOperator_NotEq_Is": 3,
+    "core/ReplaceComparisonOperator_NotEq_IsNot": 3,
+    "core/ReplaceBinaryOperator_FloorDiv_Add": 3,
+    "core/ReplaceBinaryOperator_FloorDiv_Sub": 3,
+    "core/ReplaceBinaryOperator_FloorDiv_Mul": 3,
+    "core/ReplaceBinaryOperator_FloorDiv_Div": 3,
+    "core/ReplaceBinaryOperator_FloorDiv_Mod": 3,
+    "core/ReplaceBinaryOperator_FloorDiv_Pow": 3,
+    "core/ReplaceBinaryOperator_FloorDiv_RShift": 3,
+    "core/ReplaceBinaryOperator_FloorDiv_LShift": 3,
+    "core/ReplaceBinaryOperator_FloorDiv_BitOr": 3,
+    "core/ReplaceBinaryOperator_FloorDiv_BitAnd": 3,
+    "core/ReplaceBinaryOperator_FloorDiv_BitXor": 3,
+    "core/ReplaceComparisonOperator_Lt_Is": 2,
+    "core/ReplaceComparisonOperator_Lt_IsNot": 2,
+    "core/ReplaceComparisonOperator_Is_IsNot": 2,
+    "core/ReplaceComparisonOperator_LtE_Eq": 2,
+    "core/ReplaceComparisonOperator_LtE_NotEq": 2,
+    "core/ReplaceComparisonOperator_LtE_Lt": 2,
+    "core/ReplaceComparisonOperator_LtE_Gt": 2,
+    "core/ReplaceComparisonOperator_LtE_GtE": 2,
+    "core/ReplaceComparisonOperator_Gt_Is": 2,
+    "core/ReplaceComparisonOperator_Gt_IsNot": 2,
+    "core/ReplaceComparisonOperator_LtE_Is": 1,
+    "core/ReplaceComparisonOperator_LtE_IsNot": 1,
+    "core/ReplaceOrWithAnd": 1,
+    "core/ReplaceBinaryOperator_Pow_Add": 1,
+    "core/ReplaceBinaryOperator_Pow_Sub": 1,
+    "core/ReplaceBinaryOperator_Pow_Mul": 1,
+    "core/ReplaceBinaryOperator_Pow_Div": 1,
+    "core/ReplaceBinaryOperator_Pow_FloorDiv": 1,
+    "core/ReplaceBinaryOperator_Pow_Mod": 1,
+    "core/ReplaceBinaryOperator_Pow_RShift": 1,
+    "core/ReplaceBinaryOperator_Pow_LShift": 1,
+    "core/ReplaceBinaryOperator_Pow_BitOr": 1,
+    "core/ReplaceBinaryOperator_Pow_BitAnd": 1,
+    "core/ReplaceBinaryOperator_Pow_BitXor": 1
+  },
+  "cases": [
+    {
+      "task_id": "HumanEval/0",
+      "name": "has_close_elements",
+      "green": 6,
+      "function": {
+        "killed": 28,
+        "mutants": 31,
+        "incompetent": 0,
+        "kill_rate": 0.903
+      },
+      "module": {
+        "killed": 28,
+        "mutants": 31,
+        "incompetent": 0,
+        "kill_rate": 0.903
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Sub_Add": 1,
+        "core/ReplaceBinaryOperator_Sub_Mul": 1,
+        "core/ReplaceBinaryOperator_Sub_Div": 1,
+        "core/ReplaceBinaryOperator_Sub_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Sub_Mod": 1,
+        "core/ReplaceBinaryOperator_Sub_Pow": 1,
+        "core/ReplaceBinaryOperator_Sub_RShift": 1,
+        "core/ReplaceBinaryOperator_Sub_LShift": 1,
+        "core/ReplaceBinaryOperator_Sub_BitOr": 1,
+        "core/ReplaceBinaryOperator_Sub_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Sub_BitXor": 1,
+        "core/ReplaceComparisonOperator_NotEq_Eq": 1,
+        "core/ReplaceComparisonOperator_NotEq_Lt": 1,
+        "core/ReplaceComparisonOperator_NotEq_LtE": 1,
+        "core/ReplaceComparisonOperator_NotEq_Gt": 1,
+        "core/ReplaceComparisonOperator_NotEq_GtE": 1,
+        "core/ReplaceComparisonOperator_NotEq_Is": 1,
+        "core/ReplaceComparisonOperator_NotEq_IsNot": 1,
+        "core/ReplaceComparisonOperator_Lt_Eq": 1,
+        "core/ReplaceComparisonOperator_Lt_NotEq": 1,
+        "core/ReplaceComparisonOperator_Lt_LtE": 1,
+        "core/ReplaceComparisonOperator_Lt_Gt": 1,
+        "core/ReplaceComparisonOperator_Lt_GtE": 1,
+        "core/ReplaceComparisonOperator_Lt_Is": 1,
+        "core/ReplaceComparisonOperator_Lt_IsNot": 1,
+        "core/AddNot": 2,
+        "core/ReplaceTrueWithFalse": 1,
+        "core/ReplaceFalseWithTrue": 1,
+        "core/ZeroIterationForLoop": 2
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/1",
+      "name": "separate_paren_groups",
+      "green": 5,
+      "function": {
+        "killed": 26,
+        "mutants": 30,
+        "incompetent": 0,
+        "kill_rate": 0.867
+      },
+      "module": {
+        "killed": 26,
+        "mutants": 30,
+        "incompetent": 0,
+        "kill_rate": 0.867
+      },
+      "ops": {
+        "core/ReplaceComparisonOperator_Eq_NotEq": 3,
+        "core/ReplaceComparisonOperator_Eq_Lt": 3,
+        "core/ReplaceComparisonOperator_Eq_LtE": 3,
+        "core/ReplaceComparisonOperator_Eq_Gt": 3,
+        "core/ReplaceComparisonOperator_Eq_GtE": 3,
+        "core/ReplaceComparisonOperator_Eq_Is": 2,
+        "core/ReplaceComparisonOperator_Eq_IsNot": 2,
+        "core/AddNot": 2,
+        "core/NumberReplacer": 8,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/2",
+      "name": "truncate_number",
+      "green": 6,
+      "function": {
+        "killed": 13,
+        "mutants": 13,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 13,
+        "mutants": 13,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Mod_Add": 1,
+        "core/ReplaceBinaryOperator_Mod_Sub": 1,
+        "core/ReplaceBinaryOperator_Mod_Mul": 1,
+        "core/ReplaceBinaryOperator_Mod_Div": 1,
+        "core/ReplaceBinaryOperator_Mod_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Mod_Pow": 1,
+        "core/ReplaceBinaryOperator_Mod_RShift": 1,
+        "core/ReplaceBinaryOperator_Mod_LShift": 1,
+        "core/ReplaceBinaryOperator_Mod_BitOr": 1,
+        "core/ReplaceBinaryOperator_Mod_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Mod_BitXor": 1,
+        "core/NumberReplacer": 2
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/3",
+      "name": "below_zero",
+      "green": 6,
+      "function": {
+        "killed": 13,
+        "mutants": 13,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 13,
+        "mutants": 13,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceComparisonOperator_Lt_Eq": 1,
+        "core/ReplaceComparisonOperator_Lt_NotEq": 1,
+        "core/ReplaceComparisonOperator_Lt_LtE": 1,
+        "core/ReplaceComparisonOperator_Lt_Gt": 1,
+        "core/ReplaceComparisonOperator_Lt_GtE": 1,
+        "core/AddNot": 1,
+        "core/ReplaceTrueWithFalse": 1,
+        "core/ReplaceFalseWithTrue": 1,
+        "core/NumberReplacer": 4,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/4",
+      "name": "mean_absolute_deviation",
+      "green": 6,
+      "function": {
+        "killed": 32,
+        "mutants": 33,
+        "incompetent": 0,
+        "kill_rate": 0.97
+      },
+      "module": {
+        "killed": 32,
+        "mutants": 33,
+        "incompetent": 0,
+        "kill_rate": 0.97
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Sub_Add": 1,
+        "core/ReplaceBinaryOperator_Sub_Mul": 1,
+        "core/ReplaceBinaryOperator_Sub_Div": 1,
+        "core/ReplaceBinaryOperator_Sub_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Sub_Mod": 1,
+        "core/ReplaceBinaryOperator_Sub_Pow": 1,
+        "core/ReplaceBinaryOperator_Sub_RShift": 1,
+        "core/ReplaceBinaryOperator_Sub_LShift": 1,
+        "core/ReplaceBinaryOperator_Sub_BitOr": 1,
+        "core/ReplaceBinaryOperator_Sub_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Sub_BitXor": 1,
+        "core/ReplaceBinaryOperator_Div_Add": 2,
+        "core/ReplaceBinaryOperator_Div_Sub": 2,
+        "core/ReplaceBinaryOperator_Div_Mul": 2,
+        "core/ReplaceBinaryOperator_Div_FloorDiv": 2,
+        "core/ReplaceBinaryOperator_Div_Mod": 2,
+        "core/ReplaceBinaryOperator_Div_Pow": 2,
+        "core/ReplaceBinaryOperator_Div_RShift": 2,
+        "core/ReplaceBinaryOperator_Div_LShift": 2,
+        "core/ReplaceBinaryOperator_Div_BitOr": 2,
+        "core/ReplaceBinaryOperator_Div_BitAnd": 2,
+        "core/ReplaceBinaryOperator_Div_BitXor": 2
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/5",
+      "name": "intersperse",
+      "green": 6,
+      "function": {
+        "killed": 15,
+        "mutants": 15,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 15,
+        "mutants": 15,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceUnaryOperator_USub_UAdd": 2,
+        "core/ReplaceUnaryOperator_USub_Invert": 2,
+        "core/ReplaceUnaryOperator_USub_Not": 2,
+        "core/ReplaceUnaryOperator_Delete_USub": 2,
+        "core/ReplaceUnaryOperator_Delete_Not": 1,
+        "core/AddNot": 1,
+        "core/NumberReplacer": 4,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/6",
+      "name": "parse_nested_parens",
+      "green": 6,
+      "function": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "module": {
+        "killed": 12,
+        "mutants": 17,
+        "incompetent": 0,
+        "kill_rate": 0.706
+      },
+      "ops": {},
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/7",
+      "name": "filter_by_substring",
+      "green": 6,
+      "function": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "module": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "ops": {},
+      "note": "no mutation records (no sites?)"
+    },
+    {
+      "task_id": "HumanEval/8",
+      "name": "sum_product",
+      "green": 6,
+      "function": {
+        "killed": 5,
+        "mutants": 5,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 5,
+        "mutants": 5,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/NumberReplacer": 4,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/9",
+      "name": "rolling_max",
+      "green": 6,
+      "function": {
+        "killed": 3,
+        "mutants": 3,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 3,
+        "mutants": 3,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceComparisonOperator_Is_IsNot": 1,
+        "core/AddNot": 1,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/10",
+      "name": "make_palindrome",
+      "green": 6,
+      "function": {
+        "killed": 25,
+        "mutants": 25,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 38,
+        "mutants": 38,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Add_Sub": 1,
+        "core/ReplaceBinaryOperator_Add_Mul": 1,
+        "core/ReplaceBinaryOperator_Add_Div": 1,
+        "core/ReplaceBinaryOperator_Add_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Add_Mod": 1,
+        "core/ReplaceBinaryOperator_Add_Pow": 1,
+        "core/ReplaceBinaryOperator_Add_RShift": 1,
+        "core/ReplaceBinaryOperator_Add_LShift": 1,
+        "core/ReplaceBinaryOperator_Add_BitOr": 1,
+        "core/ReplaceBinaryOperator_Add_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Add_BitXor": 1,
+        "core/ReplaceUnaryOperator_USub_UAdd": 1,
+        "core/ReplaceUnaryOperator_USub_Invert": 1,
+        "core/ReplaceUnaryOperator_USub_Not": 1,
+        "core/ReplaceUnaryOperator_Delete_USub": 1,
+        "core/ReplaceUnaryOperator_Delete_Not": 2,
+        "core/AddNot": 2,
+        "core/NumberReplacer": 6
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/11",
+      "name": "string_xor",
+      "green": 6,
+      "function": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "module": {
+        "killed": 7,
+        "mutants": 8,
+        "incompetent": 0,
+        "kill_rate": 0.875
+      },
+      "ops": {},
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/12",
+      "name": "longest",
+      "green": 6,
+      "function": {
+        "killed": 9,
+        "mutants": 11,
+        "incompetent": 0,
+        "kill_rate": 0.818
+      },
+      "module": {
+        "killed": 9,
+        "mutants": 11,
+        "incompetent": 0,
+        "kill_rate": 0.818
+      },
+      "ops": {
+        "core/ReplaceComparisonOperator_Eq_NotEq": 1,
+        "core/ReplaceComparisonOperator_Eq_Lt": 1,
+        "core/ReplaceComparisonOperator_Eq_LtE": 1,
+        "core/ReplaceComparisonOperator_Eq_Gt": 1,
+        "core/ReplaceComparisonOperator_Eq_GtE": 1,
+        "core/ReplaceComparisonOperator_Eq_Is": 1,
+        "core/ReplaceComparisonOperator_Eq_IsNot": 1,
+        "core/ReplaceUnaryOperator_Delete_Not": 1,
+        "core/AddNot": 2,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/13",
+      "name": "greatest_common_divisor",
+      "green": 6,
+      "function": {
+        "killed": 12,
+        "mutants": 12,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 12,
+        "mutants": 12,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Mod_Add": 1,
+        "core/ReplaceBinaryOperator_Mod_Sub": 1,
+        "core/ReplaceBinaryOperator_Mod_Mul": 1,
+        "core/ReplaceBinaryOperator_Mod_Div": 1,
+        "core/ReplaceBinaryOperator_Mod_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Mod_Pow": 1,
+        "core/ReplaceBinaryOperator_Mod_RShift": 1,
+        "core/ReplaceBinaryOperator_Mod_LShift": 1,
+        "core/ReplaceBinaryOperator_Mod_BitOr": 1,
+        "core/ReplaceBinaryOperator_Mod_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Mod_BitXor": 1,
+        "core/AddNot": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/14",
+      "name": "all_prefixes",
+      "green": 5,
+      "function": {
+        "killed": 14,
+        "mutants": 14,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 14,
+        "mutants": 14,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Add_Sub": 1,
+        "core/ReplaceBinaryOperator_Add_Mul": 1,
+        "core/ReplaceBinaryOperator_Add_Div": 1,
+        "core/ReplaceBinaryOperator_Add_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Add_Mod": 1,
+        "core/ReplaceBinaryOperator_Add_Pow": 1,
+        "core/ReplaceBinaryOperator_Add_RShift": 1,
+        "core/ReplaceBinaryOperator_Add_LShift": 1,
+        "core/ReplaceBinaryOperator_Add_BitOr": 1,
+        "core/ReplaceBinaryOperator_Add_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Add_BitXor": 1,
+        "core/NumberReplacer": 2,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/15",
+      "name": "string_sequence",
+      "green": 4,
+      "function": {
+        "killed": 13,
+        "mutants": 13,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 13,
+        "mutants": 13,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Add_Sub": 1,
+        "core/ReplaceBinaryOperator_Add_Mul": 1,
+        "core/ReplaceBinaryOperator_Add_Div": 1,
+        "core/ReplaceBinaryOperator_Add_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Add_Mod": 1,
+        "core/ReplaceBinaryOperator_Add_Pow": 1,
+        "core/ReplaceBinaryOperator_Add_RShift": 1,
+        "core/ReplaceBinaryOperator_Add_LShift": 1,
+        "core/ReplaceBinaryOperator_Add_BitOr": 1,
+        "core/ReplaceBinaryOperator_Add_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Add_BitXor": 1,
+        "core/NumberReplacer": 2
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/16",
+      "name": "count_distinct_characters",
+      "green": 6,
+      "function": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "module": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "ops": {},
+      "note": "no mutation records (no sites?)"
+    },
+    {
+      "task_id": "HumanEval/17",
+      "name": "parse_music",
+      "green": 6,
+      "function": {
+        "killed": 6,
+        "mutants": 6,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 6,
+        "mutants": 6,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/NumberReplacer": 6
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/18",
+      "name": "how_many_times",
+      "green": 6,
+      "function": {
+        "killed": 47,
+        "mutants": 48,
+        "incompetent": 0,
+        "kill_rate": 0.979
+      },
+      "module": {
+        "killed": 47,
+        "mutants": 48,
+        "incompetent": 0,
+        "kill_rate": 0.979
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Add_Sub": 2,
+        "core/ReplaceBinaryOperator_Add_Mul": 2,
+        "core/ReplaceBinaryOperator_Add_Div": 2,
+        "core/ReplaceBinaryOperator_Add_FloorDiv": 2,
+        "core/ReplaceBinaryOperator_Add_Mod": 2,
+        "core/ReplaceBinaryOperator_Add_Pow": 2,
+        "core/ReplaceBinaryOperator_Add_RShift": 2,
+        "core/ReplaceBinaryOperator_Add_LShift": 2,
+        "core/ReplaceBinaryOperator_Add_BitOr": 2,
+        "core/ReplaceBinaryOperator_Add_BitAnd": 2,
+        "core/ReplaceBinaryOperator_Add_BitXor": 2,
+        "core/ReplaceBinaryOperator_Sub_Add": 1,
+        "core/ReplaceBinaryOperator_Sub_Mul": 1,
+        "core/ReplaceBinaryOperator_Sub_Div": 1,
+        "core/ReplaceBinaryOperator_Sub_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Sub_Mod": 1,
+        "core/ReplaceBinaryOperator_Sub_Pow": 1,
+        "core/ReplaceBinaryOperator_Sub_RShift": 1,
+        "core/ReplaceBinaryOperator_Sub_LShift": 1,
+        "core/ReplaceBinaryOperator_Sub_BitOr": 1,
+        "core/ReplaceBinaryOperator_Sub_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Sub_BitXor": 1,
+        "core/ReplaceComparisonOperator_Eq_NotEq": 1,
+        "core/ReplaceComparisonOperator_Eq_Lt": 1,
+        "core/ReplaceComparisonOperator_Eq_LtE": 1,
+        "core/ReplaceComparisonOperator_Eq_Gt": 1,
+        "core/ReplaceComparisonOperator_Eq_GtE": 1,
+        "core/ReplaceComparisonOperator_Eq_Is": 1,
+        "core/ReplaceComparisonOperator_Eq_IsNot": 1,
+        "core/AddNot": 1,
+        "core/NumberReplacer": 6,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/19",
+      "name": "sort_numbers",
+      "green": 6,
+      "function": {
+        "killed": 18,
+        "mutants": 20,
+        "incompetent": 0,
+        "kill_rate": 0.9
+      },
+      "module": {
+        "killed": 18,
+        "mutants": 20,
+        "incompetent": 0,
+        "kill_rate": 0.9
+      },
+      "ops": {
+        "core/NumberReplacer": 20
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/20",
+      "name": "find_closest_elements",
+      "green": 6,
+      "function": {
+        "killed": 34,
+        "mutants": 42,
+        "incompetent": 0,
+        "kill_rate": 0.81
+      },
+      "module": {
+        "killed": 34,
+        "mutants": 42,
+        "incompetent": 0,
+        "kill_rate": 0.81
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Sub_Add": 2,
+        "core/ReplaceBinaryOperator_Sub_Mul": 2,
+        "core/ReplaceBinaryOperator_Sub_Div": 2,
+        "core/ReplaceBinaryOperator_Sub_FloorDiv": 2,
+        "core/ReplaceBinaryOperator_Sub_Mod": 2,
+        "core/ReplaceBinaryOperator_Sub_Pow": 2,
+        "core/ReplaceBinaryOperator_Sub_RShift": 2,
+        "core/ReplaceBinaryOperator_Sub_LShift": 2,
+        "core/ReplaceBinaryOperator_Sub_BitOr": 2,
+        "core/ReplaceBinaryOperator_Sub_BitAnd": 2,
+        "core/ReplaceBinaryOperator_Sub_BitXor": 2,
+        "core/ReplaceComparisonOperator_NotEq_Eq": 1,
+        "core/ReplaceComparisonOperator_NotEq_Lt": 1,
+        "core/ReplaceComparisonOperator_NotEq_LtE": 1,
+        "core/ReplaceComparisonOperator_NotEq_Gt": 1,
+        "core/ReplaceComparisonOperator_NotEq_GtE": 1,
+        "core/ReplaceComparisonOperator_NotEq_Is": 1,
+        "core/ReplaceComparisonOperator_NotEq_IsNot": 1,
+        "core/ReplaceComparisonOperator_Lt_Eq": 1,
+        "core/ReplaceComparisonOperator_Lt_NotEq": 1,
+        "core/ReplaceComparisonOperator_Lt_LtE": 1,
+        "core/ReplaceComparisonOperator_Lt_Gt": 1,
+        "core/ReplaceComparisonOperator_Lt_GtE": 1,
+        "core/ReplaceComparisonOperator_Lt_Is": 1,
+        "core/ReplaceComparisonOperator_Lt_IsNot": 1,
+        "core/ReplaceComparisonOperator_Is_IsNot": 1,
+        "core/AddNot": 3,
+        "core/ZeroIterationForLoop": 2
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/21",
+      "name": "rescale_to_unit",
+      "green": 6,
+      "function": {
+        "killed": 33,
+        "mutants": 33,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 33,
+        "mutants": 33,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Sub_Add": 2,
+        "core/ReplaceBinaryOperator_Sub_Mul": 2,
+        "core/ReplaceBinaryOperator_Sub_Div": 2,
+        "core/ReplaceBinaryOperator_Sub_FloorDiv": 2,
+        "core/ReplaceBinaryOperator_Sub_Mod": 2,
+        "core/ReplaceBinaryOperator_Sub_Pow": 2,
+        "core/ReplaceBinaryOperator_Sub_RShift": 2,
+        "core/ReplaceBinaryOperator_Sub_LShift": 2,
+        "core/ReplaceBinaryOperator_Sub_BitOr": 2,
+        "core/ReplaceBinaryOperator_Sub_BitAnd": 2,
+        "core/ReplaceBinaryOperator_Sub_BitXor": 2,
+        "core/ReplaceBinaryOperator_Div_Add": 1,
+        "core/ReplaceBinaryOperator_Div_Sub": 1,
+        "core/ReplaceBinaryOperator_Div_Mul": 1,
+        "core/ReplaceBinaryOperator_Div_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Div_Mod": 1,
+        "core/ReplaceBinaryOperator_Div_Pow": 1,
+        "core/ReplaceBinaryOperator_Div_RShift": 1,
+        "core/ReplaceBinaryOperator_Div_LShift": 1,
+        "core/ReplaceBinaryOperator_Div_BitOr": 1,
+        "core/ReplaceBinaryOperator_Div_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Div_BitXor": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/22",
+      "name": "filter_integers",
+      "green": 6,
+      "function": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "module": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "ops": {},
+      "note": "no mutation records (no sites?)"
+    },
+    {
+      "task_id": "HumanEval/23",
+      "name": "strlen",
+      "green": 5,
+      "function": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "module": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "ops": {},
+      "note": "no mutation records (no sites?)"
+    },
+    {
+      "task_id": "HumanEval/24",
+      "name": "largest_divisor",
+      "green": 6,
+      "function": {
+        "killed": 19,
+        "mutants": 20,
+        "incompetent": 0,
+        "kill_rate": 0.95
+      },
+      "module": {
+        "killed": 19,
+        "mutants": 20,
+        "incompetent": 0,
+        "kill_rate": 0.95
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Mod_Add": 1,
+        "core/ReplaceBinaryOperator_Mod_Sub": 1,
+        "core/ReplaceBinaryOperator_Mod_Mul": 1,
+        "core/ReplaceBinaryOperator_Mod_Div": 1,
+        "core/ReplaceBinaryOperator_Mod_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Mod_Pow": 1,
+        "core/ReplaceBinaryOperator_Mod_RShift": 1,
+        "core/ReplaceBinaryOperator_Mod_LShift": 1,
+        "core/ReplaceBinaryOperator_Mod_BitOr": 1,
+        "core/ReplaceBinaryOperator_Mod_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Mod_BitXor": 1,
+        "core/ReplaceComparisonOperator_Eq_NotEq": 1,
+        "core/ReplaceComparisonOperator_Eq_Lt": 1,
+        "core/ReplaceComparisonOperator_Eq_LtE": 1,
+        "core/ReplaceComparisonOperator_Eq_Gt": 1,
+        "core/ReplaceComparisonOperator_Eq_GtE": 1,
+        "core/AddNot": 1,
+        "core/NumberReplacer": 2,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/25",
+      "name": "factorize",
+      "green": 6,
+      "function": {
+        "killed": 44,
+        "mutants": 52,
+        "incompetent": 0,
+        "kill_rate": 0.846
+      },
+      "module": {
+        "killed": 44,
+        "mutants": 52,
+        "incompetent": 0,
+        "kill_rate": 0.846
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Add_Sub": 1,
+        "core/ReplaceBinaryOperator_Add_Mul": 1,
+        "core/ReplaceBinaryOperator_Add_Div": 1,
+        "core/ReplaceBinaryOperator_Add_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Add_Mod": 1,
+        "core/ReplaceBinaryOperator_Add_Pow": 1,
+        "core/ReplaceBinaryOperator_Add_RShift": 1,
+        "core/ReplaceBinaryOperator_Add_LShift": 1,
+        "core/ReplaceBinaryOperator_Add_BitOr": 1,
+        "core/ReplaceBinaryOperator_Add_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Add_BitXor": 1,
+        "core/ReplaceBinaryOperator_Mod_Add": 1,
+        "core/ReplaceBinaryOperator_Mod_Sub": 1,
+        "core/ReplaceBinaryOperator_Mod_Mul": 1,
+        "core/ReplaceBinaryOperator_Mod_Div": 1,
+        "core/ReplaceBinaryOperator_Mod_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Mod_Pow": 1,
+        "core/ReplaceBinaryOperator_Mod_RShift": 1,
+        "core/ReplaceBinaryOperator_Mod_LShift": 1,
+        "core/ReplaceBinaryOperator_Mod_BitOr": 1,
+        "core/ReplaceBinaryOperator_Mod_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Mod_BitXor": 1,
+        "core/ReplaceComparisonOperator_Eq_NotEq": 1,
+        "core/ReplaceComparisonOperator_Eq_Lt": 1,
+        "core/ReplaceComparisonOperator_Eq_LtE": 1,
+        "core/ReplaceComparisonOperator_Eq_Gt": 1,
+        "core/ReplaceComparisonOperator_Eq_GtE": 1,
+        "core/ReplaceComparisonOperator_LtE_Eq": 1,
+        "core/ReplaceComparisonOperator_LtE_NotEq": 1,
+        "core/ReplaceComparisonOperator_LtE_Lt": 1,
+        "core/ReplaceComparisonOperator_LtE_Gt": 1,
+        "core/ReplaceComparisonOperator_LtE_GtE": 1,
+        "core/ReplaceComparisonOperator_LtE_Is": 1,
+        "core/ReplaceComparisonOperator_LtE_IsNot": 1,
+        "core/ReplaceComparisonOperator_Gt_Eq": 1,
+        "core/ReplaceComparisonOperator_Gt_NotEq": 1,
+        "core/ReplaceComparisonOperator_Gt_Lt": 1,
+        "core/ReplaceComparisonOperator_Gt_LtE": 1,
+        "core/ReplaceComparisonOperator_Gt_GtE": 1,
+        "core/AddNot": 3,
+        "core/NumberReplacer": 10
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/26",
+      "name": "remove_duplicates",
+      "green": 6,
+      "function": {
+        "killed": 6,
+        "mutants": 7,
+        "incompetent": 0,
+        "kill_rate": 0.857
+      },
+      "module": {
+        "killed": 6,
+        "mutants": 7,
+        "incompetent": 0,
+        "kill_rate": 0.857
+      },
+      "ops": {
+        "core/ReplaceComparisonOperator_LtE_Eq": 1,
+        "core/ReplaceComparisonOperator_LtE_NotEq": 1,
+        "core/ReplaceComparisonOperator_LtE_Lt": 1,
+        "core/ReplaceComparisonOperator_LtE_Gt": 1,
+        "core/ReplaceComparisonOperator_LtE_GtE": 1,
+        "core/NumberReplacer": 2
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/27",
+      "name": "flip_case",
+      "green": 6,
+      "function": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "module": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "ops": {},
+      "note": "no mutation records (no sites?)"
+    },
+    {
+      "task_id": "HumanEval/28",
+      "name": "concatenate",
+      "green": 5,
+      "function": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "module": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "ops": {},
+      "note": "no mutation records (no sites?)"
+    },
+    {
+      "task_id": "HumanEval/29",
+      "name": "filter_by_prefix",
+      "green": 6,
+      "function": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "module": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "ops": {},
+      "note": "no mutation records (no sites?)"
+    },
+    {
+      "task_id": "HumanEval/30",
+      "name": "get_positive",
+      "green": 6,
+      "function": {
+        "killed": 7,
+        "mutants": 7,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 7,
+        "mutants": 7,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceComparisonOperator_Gt_Eq": 1,
+        "core/ReplaceComparisonOperator_Gt_NotEq": 1,
+        "core/ReplaceComparisonOperator_Gt_Lt": 1,
+        "core/ReplaceComparisonOperator_Gt_LtE": 1,
+        "core/ReplaceComparisonOperator_Gt_GtE": 1,
+        "core/NumberReplacer": 2
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/31",
+      "name": "is_prime",
+      "green": 6,
+      "function": {
+        "killed": 41,
+        "mutants": 46,
+        "incompetent": 0,
+        "kill_rate": 0.891
+      },
+      "module": {
+        "killed": 41,
+        "mutants": 46,
+        "incompetent": 0,
+        "kill_rate": 0.891
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Sub_Add": 1,
+        "core/ReplaceBinaryOperator_Sub_Mul": 1,
+        "core/ReplaceBinaryOperator_Sub_Div": 1,
+        "core/ReplaceBinaryOperator_Sub_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Sub_Mod": 1,
+        "core/ReplaceBinaryOperator_Sub_Pow": 1,
+        "core/ReplaceBinaryOperator_Sub_RShift": 1,
+        "core/ReplaceBinaryOperator_Sub_LShift": 1,
+        "core/ReplaceBinaryOperator_Sub_BitOr": 1,
+        "core/ReplaceBinaryOperator_Sub_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Sub_BitXor": 1,
+        "core/ReplaceBinaryOperator_Mod_Add": 1,
+        "core/ReplaceBinaryOperator_Mod_Sub": 1,
+        "core/ReplaceBinaryOperator_Mod_Mul": 1,
+        "core/ReplaceBinaryOperator_Mod_Div": 1,
+        "core/ReplaceBinaryOperator_Mod_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Mod_Pow": 1,
+        "core/ReplaceBinaryOperator_Mod_RShift": 1,
+        "core/ReplaceBinaryOperator_Mod_LShift": 1,
+        "core/ReplaceBinaryOperator_Mod_BitOr": 1,
+        "core/ReplaceBinaryOperator_Mod_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Mod_BitXor": 1,
+        "core/ReplaceComparisonOperator_Eq_NotEq": 1,
+        "core/ReplaceComparisonOperator_Eq_Lt": 1,
+        "core/ReplaceComparisonOperator_Eq_LtE": 1,
+        "core/ReplaceComparisonOperator_Eq_Gt": 1,
+        "core/ReplaceComparisonOperator_Eq_GtE": 1,
+        "core/ReplaceComparisonOperator_Lt_Eq": 1,
+        "core/ReplaceComparisonOperator_Lt_NotEq": 1,
+        "core/ReplaceComparisonOperator_Lt_LtE": 1,
+        "core/ReplaceComparisonOperator_Lt_Gt": 1,
+        "core/ReplaceComparisonOperator_Lt_GtE": 1,
+        "core/AddNot": 2,
+        "core/ReplaceTrueWithFalse": 1,
+        "core/ReplaceFalseWithTrue": 2,
+        "core/NumberReplacer": 8,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/32",
+      "name": "find_zero",
+      "green": 6,
+      "function": {
+        "killed": 85,
+        "mutants": 93,
+        "incompetent": 0,
+        "kill_rate": 0.914
+      },
+      "module": {
+        "killed": 96,
+        "mutants": 104,
+        "incompetent": 0,
+        "kill_rate": 0.923
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Add_Sub": 1,
+        "core/ReplaceBinaryOperator_Add_Mul": 1,
+        "core/ReplaceBinaryOperator_Add_Div": 1,
+        "core/ReplaceBinaryOperator_Add_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Add_Mod": 1,
+        "core/ReplaceBinaryOperator_Add_Pow": 1,
+        "core/ReplaceBinaryOperator_Add_RShift": 1,
+        "core/ReplaceBinaryOperator_Add_LShift": 1,
+        "core/ReplaceBinaryOperator_Add_BitOr": 1,
+        "core/ReplaceBinaryOperator_Add_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Add_BitXor": 1,
+        "core/ReplaceBinaryOperator_Sub_Add": 1,
+        "core/ReplaceBinaryOperator_Sub_Mul": 1,
+        "core/ReplaceBinaryOperator_Sub_Div": 1,
+        "core/ReplaceBinaryOperator_Sub_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Sub_Mod": 1,
+        "core/ReplaceBinaryOperator_Sub_Pow": 1,
+        "core/ReplaceBinaryOperator_Sub_RShift": 1,
+        "core/ReplaceBinaryOperator_Sub_LShift": 1,
+        "core/ReplaceBinaryOperator_Sub_BitOr": 1,
+        "core/ReplaceBinaryOperator_Sub_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Sub_BitXor": 1,
+        "core/ReplaceBinaryOperator_Mul_Add": 2,
+        "core/ReplaceBinaryOperator_Mul_Sub": 2,
+        "core/ReplaceBinaryOperator_Mul_Div": 2,
+        "core/ReplaceBinaryOperator_Mul_FloorDiv": 2,
+        "core/ReplaceBinaryOperator_Mul_Mod": 2,
+        "core/ReplaceBinaryOperator_Mul_Pow": 2,
+        "core/ReplaceBinaryOperator_Mul_RShift": 2,
+        "core/ReplaceBinaryOperator_Mul_LShift": 2,
+        "core/ReplaceBinaryOperator_Mul_BitOr": 2,
+        "core/ReplaceBinaryOperator_Mul_BitAnd": 2,
+        "core/ReplaceBinaryOperator_Mul_BitXor": 2,
+        "core/ReplaceBinaryOperator_Div_Add": 1,
+        "core/ReplaceBinaryOperator_Div_Sub": 1,
+        "core/ReplaceBinaryOperator_Div_Mul": 1,
+        "core/ReplaceBinaryOperator_Div_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Div_Mod": 1,
+        "core/ReplaceBinaryOperator_Div_Pow": 1,
+        "core/ReplaceBinaryOperator_Div_RShift": 1,
+        "core/ReplaceBinaryOperator_Div_LShift": 1,
+        "core/ReplaceBinaryOperator_Div_BitOr": 1,
+        "core/ReplaceBinaryOperator_Div_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Div_BitXor": 1,
+        "core/ReplaceComparisonOperator_Gt_Eq": 3,
+        "core/ReplaceComparisonOperator_Gt_NotEq": 3,
+        "core/ReplaceComparisonOperator_Gt_Lt": 3,
+        "core/ReplaceComparisonOperator_Gt_LtE": 3,
+        "core/ReplaceComparisonOperator_Gt_GtE": 3,
+        "core/ReplaceUnaryOperator_USub_UAdd": 1,
+        "core/ReplaceUnaryOperator_USub_Invert": 1,
+        "core/ReplaceUnaryOperator_USub_Not": 1,
+        "core/ReplaceUnaryOperator_Delete_USub": 1,
+        "core/AddNot": 3,
+        "core/NumberReplacer": 16
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/33",
+      "name": "sort_third",
+      "green": 6,
+      "function": {
+        "killed": 4,
+        "mutants": 4,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 4,
+        "mutants": 4,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/NumberReplacer": 4
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/34",
+      "name": "unique",
+      "green": 6,
+      "function": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "module": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "ops": {},
+      "note": "no mutation records (no sites?)"
+    },
+    {
+      "task_id": "HumanEval/35",
+      "name": "max_element",
+      "green": 6,
+      "function": {
+        "killed": 9,
+        "mutants": 11,
+        "incompetent": 0,
+        "kill_rate": 0.818
+      },
+      "module": {
+        "killed": 9,
+        "mutants": 11,
+        "incompetent": 0,
+        "kill_rate": 0.818
+      },
+      "ops": {
+        "core/ReplaceComparisonOperator_Gt_Eq": 1,
+        "core/ReplaceComparisonOperator_Gt_NotEq": 1,
+        "core/ReplaceComparisonOperator_Gt_Lt": 1,
+        "core/ReplaceComparisonOperator_Gt_LtE": 1,
+        "core/ReplaceComparisonOperator_Gt_GtE": 1,
+        "core/ReplaceComparisonOperator_Gt_Is": 1,
+        "core/ReplaceComparisonOperator_Gt_IsNot": 1,
+        "core/AddNot": 1,
+        "core/NumberReplacer": 2,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/36",
+      "name": "fizz_buzz",
+      "green": 6,
+      "function": {
+        "killed": 50,
+        "mutants": 53,
+        "incompetent": 0,
+        "kill_rate": 0.943
+      },
+      "module": {
+        "killed": 50,
+        "mutants": 53,
+        "incompetent": 0,
+        "kill_rate": 0.943
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Mod_Add": 2,
+        "core/ReplaceBinaryOperator_Mod_Sub": 2,
+        "core/ReplaceBinaryOperator_Mod_Mul": 2,
+        "core/ReplaceBinaryOperator_Mod_Div": 2,
+        "core/ReplaceBinaryOperator_Mod_FloorDiv": 2,
+        "core/ReplaceBinaryOperator_Mod_Pow": 2,
+        "core/ReplaceBinaryOperator_Mod_RShift": 2,
+        "core/ReplaceBinaryOperator_Mod_LShift": 2,
+        "core/ReplaceBinaryOperator_Mod_BitOr": 2,
+        "core/ReplaceBinaryOperator_Mod_BitAnd": 2,
+        "core/ReplaceBinaryOperator_Mod_BitXor": 2,
+        "core/ReplaceComparisonOperator_Eq_NotEq": 3,
+        "core/ReplaceComparisonOperator_Eq_Lt": 3,
+        "core/ReplaceComparisonOperator_Eq_LtE": 3,
+        "core/ReplaceComparisonOperator_Eq_Gt": 3,
+        "core/ReplaceComparisonOperator_Eq_GtE": 3,
+        "core/ReplaceComparisonOperator_Eq_Is": 1,
+        "core/ReplaceComparisonOperator_Eq_IsNot": 1,
+        "core/AddNot": 1,
+        "core/ReplaceOrWithAnd": 1,
+        "core/NumberReplacer": 10,
+        "core/ZeroIterationForLoop": 2
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/37",
+      "name": "sort_even",
+      "green": 6,
+      "function": {
+        "killed": 19,
+        "mutants": 21,
+        "incompetent": 0,
+        "kill_rate": 0.905
+      },
+      "module": {
+        "killed": 19,
+        "mutants": 21,
+        "incompetent": 0,
+        "kill_rate": 0.905
+      },
+      "ops": {
+        "core/ReplaceComparisonOperator_Gt_Eq": 1,
+        "core/ReplaceComparisonOperator_Gt_NotEq": 1,
+        "core/ReplaceComparisonOperator_Gt_Lt": 1,
+        "core/ReplaceComparisonOperator_Gt_LtE": 1,
+        "core/ReplaceComparisonOperator_Gt_GtE": 1,
+        "core/ReplaceComparisonOperator_Gt_Is": 1,
+        "core/ReplaceComparisonOperator_Gt_IsNot": 1,
+        "core/ReplaceUnaryOperator_USub_UAdd": 1,
+        "core/ReplaceUnaryOperator_USub_Invert": 1,
+        "core/ReplaceUnaryOperator_USub_Not": 1,
+        "core/ReplaceUnaryOperator_Delete_USub": 1,
+        "core/AddNot": 1,
+        "core/NumberReplacer": 8,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/38",
+      "name": "decode_cyclic",
+      "green": 4,
+      "function": {
+        "killed": 0,
+        "mutants": 0,
+        "incompetent": 0,
+        "kill_rate": null
+      },
+      "module": {
+        "killed": 72,
+        "mutants": 88,
+        "incompetent": 0,
+        "kill_rate": 0.818
+      },
+      "ops": {},
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/39",
+      "name": "prime_fib",
+      "green": 6,
+      "function": {
+        "killed": 49,
+        "mutants": 52,
+        "incompetent": 0,
+        "kill_rate": 0.942
+      },
+      "module": {
+        "killed": 92,
+        "mutants": 111,
+        "incompetent": 0,
+        "kill_rate": 0.829
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Add_Sub": 1,
+        "core/ReplaceBinaryOperator_Add_Mul": 1,
+        "core/ReplaceBinaryOperator_Add_Div": 1,
+        "core/ReplaceBinaryOperator_Add_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Add_Mod": 1,
+        "core/ReplaceBinaryOperator_Add_Pow": 1,
+        "core/ReplaceBinaryOperator_Add_RShift": 1,
+        "core/ReplaceBinaryOperator_Add_LShift": 1,
+        "core/ReplaceBinaryOperator_Add_BitOr": 1,
+        "core/ReplaceBinaryOperator_Add_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Add_BitXor": 1,
+        "core/ReplaceComparisonOperator_Eq_NotEq": 1,
+        "core/ReplaceComparisonOperator_Eq_Lt": 1,
+        "core/ReplaceComparisonOperator_Eq_LtE": 1,
+        "core/ReplaceComparisonOperator_Eq_Gt": 1,
+        "core/ReplaceComparisonOperator_Eq_GtE": 1,
+        "core/ReplaceUnaryOperator_USub_UAdd": 4,
+        "core/ReplaceUnaryOperator_USub_Invert": 4,
+        "core/ReplaceUnaryOperator_USub_Not": 4,
+        "core/ReplaceUnaryOperator_Delete_USub": 4,
+        "core/AddNot": 3,
+        "core/ReplaceTrueWithFalse": 1,
+        "core/NumberReplacer": 16
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/40",
+      "name": "triples_sum_to_zero",
+      "green": 6,
+      "function": {
+        "killed": 36,
+        "mutants": 61,
+        "incompetent": 0,
+        "kill_rate": 0.59
+      },
+      "module": {
+        "killed": 36,
+        "mutants": 61,
+        "incompetent": 0,
+        "kill_rate": 0.59
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Add_Sub": 4,
+        "core/ReplaceBinaryOperator_Add_Mul": 4,
+        "core/ReplaceBinaryOperator_Add_Div": 4,
+        "core/ReplaceBinaryOperator_Add_FloorDiv": 4,
+        "core/ReplaceBinaryOperator_Add_Mod": 4,
+        "core/ReplaceBinaryOperator_Add_Pow": 4,
+        "core/ReplaceBinaryOperator_Add_RShift": 4,
+        "core/ReplaceBinaryOperator_Add_LShift": 4,
+        "core/ReplaceBinaryOperator_Add_BitOr": 4,
+        "core/ReplaceBinaryOperator_Add_BitAnd": 4,
+        "core/ReplaceBinaryOperator_Add_BitXor": 4,
+        "core/ReplaceComparisonOperator_Eq_NotEq": 1,
+        "core/ReplaceComparisonOperator_Eq_Lt": 1,
+        "core/ReplaceComparisonOperator_Eq_LtE": 1,
+        "core/ReplaceComparisonOperator_Eq_Gt": 1,
+        "core/ReplaceComparisonOperator_Eq_GtE": 1,
+        "core/AddNot": 1,
+        "core/ReplaceTrueWithFalse": 1,
+        "core/ReplaceFalseWithTrue": 1,
+        "core/NumberReplacer": 6,
+        "core/ZeroIterationForLoop": 3
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/41",
+      "name": "car_race_collision",
+      "green": 5,
+      "function": {
+        "killed": 13,
+        "mutants": 13,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 13,
+        "mutants": 13,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Pow_Add": 1,
+        "core/ReplaceBinaryOperator_Pow_Sub": 1,
+        "core/ReplaceBinaryOperator_Pow_Mul": 1,
+        "core/ReplaceBinaryOperator_Pow_Div": 1,
+        "core/ReplaceBinaryOperator_Pow_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Pow_Mod": 1,
+        "core/ReplaceBinaryOperator_Pow_RShift": 1,
+        "core/ReplaceBinaryOperator_Pow_LShift": 1,
+        "core/ReplaceBinaryOperator_Pow_BitOr": 1,
+        "core/ReplaceBinaryOperator_Pow_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Pow_BitXor": 1,
+        "core/NumberReplacer": 2
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/42",
+      "name": "incr_list",
+      "green": 5,
+      "function": {
+        "killed": 13,
+        "mutants": 13,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 13,
+        "mutants": 13,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Add_Sub": 1,
+        "core/ReplaceBinaryOperator_Add_Mul": 1,
+        "core/ReplaceBinaryOperator_Add_Div": 1,
+        "core/ReplaceBinaryOperator_Add_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Add_Mod": 1,
+        "core/ReplaceBinaryOperator_Add_Pow": 1,
+        "core/ReplaceBinaryOperator_Add_RShift": 1,
+        "core/ReplaceBinaryOperator_Add_LShift": 1,
+        "core/ReplaceBinaryOperator_Add_BitOr": 1,
+        "core/ReplaceBinaryOperator_Add_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Add_BitXor": 1,
+        "core/NumberReplacer": 2
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/43",
+      "name": "pairs_sum_to_zero",
+      "green": 6,
+      "function": {
+        "killed": 34,
+        "mutants": 36,
+        "incompetent": 0,
+        "kill_rate": 0.944
+      },
+      "module": {
+        "killed": 34,
+        "mutants": 36,
+        "incompetent": 0,
+        "kill_rate": 0.944
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Add_Sub": 2,
+        "core/ReplaceBinaryOperator_Add_Mul": 2,
+        "core/ReplaceBinaryOperator_Add_Div": 2,
+        "core/ReplaceBinaryOperator_Add_FloorDiv": 2,
+        "core/ReplaceBinaryOperator_Add_Mod": 2,
+        "core/ReplaceBinaryOperator_Add_Pow": 2,
+        "core/ReplaceBinaryOperator_Add_RShift": 2,
+        "core/ReplaceBinaryOperator_Add_LShift": 2,
+        "core/ReplaceBinaryOperator_Add_BitOr": 2,
+        "core/ReplaceBinaryOperator_Add_BitAnd": 2,
+        "core/ReplaceBinaryOperator_Add_BitXor": 2,
+        "core/ReplaceComparisonOperator_Eq_NotEq": 1,
+        "core/ReplaceComparisonOperator_Eq_Lt": 1,
+        "core/ReplaceComparisonOperator_Eq_LtE": 1,
+        "core/ReplaceComparisonOperator_Eq_Gt": 1,
+        "core/ReplaceComparisonOperator_Eq_GtE": 1,
+        "core/AddNot": 1,
+        "core/ReplaceTrueWithFalse": 1,
+        "core/ReplaceFalseWithTrue": 1,
+        "core/NumberReplacer": 4,
+        "core/ZeroIterationForLoop": 2
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/44",
+      "name": "change_base",
+      "green": 6,
+      "function": {
+        "killed": 30,
+        "mutants": 30,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 30,
+        "mutants": 30,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Add_Sub": 1,
+        "core/ReplaceBinaryOperator_Add_Mul": 1,
+        "core/ReplaceBinaryOperator_Add_Div": 1,
+        "core/ReplaceBinaryOperator_Add_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Add_Mod": 1,
+        "core/ReplaceBinaryOperator_Add_Pow": 1,
+        "core/ReplaceBinaryOperator_Add_RShift": 1,
+        "core/ReplaceBinaryOperator_Add_LShift": 1,
+        "core/ReplaceBinaryOperator_Add_BitOr": 1,
+        "core/ReplaceBinaryOperator_Add_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Add_BitXor": 1,
+        "core/ReplaceBinaryOperator_Mod_Add": 1,
+        "core/ReplaceBinaryOperator_Mod_Sub": 1,
+        "core/ReplaceBinaryOperator_Mod_Mul": 1,
+        "core/ReplaceBinaryOperator_Mod_Div": 1,
+        "core/ReplaceBinaryOperator_Mod_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Mod_Pow": 1,
+        "core/ReplaceBinaryOperator_Mod_RShift": 1,
+        "core/ReplaceBinaryOperator_Mod_LShift": 1,
+        "core/ReplaceBinaryOperator_Mod_BitOr": 1,
+        "core/ReplaceBinaryOperator_Mod_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Mod_BitXor": 1,
+        "core/ReplaceComparisonOperator_Gt_Eq": 1,
+        "core/ReplaceComparisonOperator_Gt_NotEq": 1,
+        "core/ReplaceComparisonOperator_Gt_Lt": 1,
+        "core/ReplaceComparisonOperator_Gt_LtE": 1,
+        "core/ReplaceComparisonOperator_Gt_GtE": 1,
+        "core/AddNot": 1,
+        "core/NumberReplacer": 2
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/45",
+      "name": "triangle_area",
+      "green": 5,
+      "function": {
+        "killed": 24,
+        "mutants": 24,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 24,
+        "mutants": 24,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Mul_Add": 1,
+        "core/ReplaceBinaryOperator_Mul_Sub": 1,
+        "core/ReplaceBinaryOperator_Mul_Div": 1,
+        "core/ReplaceBinaryOperator_Mul_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Mul_Mod": 1,
+        "core/ReplaceBinaryOperator_Mul_Pow": 1,
+        "core/ReplaceBinaryOperator_Mul_RShift": 1,
+        "core/ReplaceBinaryOperator_Mul_LShift": 1,
+        "core/ReplaceBinaryOperator_Mul_BitOr": 1,
+        "core/ReplaceBinaryOperator_Mul_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Mul_BitXor": 1,
+        "core/ReplaceBinaryOperator_Div_Add": 1,
+        "core/ReplaceBinaryOperator_Div_Sub": 1,
+        "core/ReplaceBinaryOperator_Div_Mul": 1,
+        "core/ReplaceBinaryOperator_Div_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Div_Mod": 1,
+        "core/ReplaceBinaryOperator_Div_Pow": 1,
+        "core/ReplaceBinaryOperator_Div_RShift": 1,
+        "core/ReplaceBinaryOperator_Div_LShift": 1,
+        "core/ReplaceBinaryOperator_Div_BitOr": 1,
+        "core/ReplaceBinaryOperator_Div_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Div_BitXor": 1,
+        "core/NumberReplacer": 2
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/46",
+      "name": "fib4",
+      "green": 6,
+      "function": {
+        "killed": 93,
+        "mutants": 97,
+        "incompetent": 0,
+        "kill_rate": 0.959
+      },
+      "module": {
+        "killed": 93,
+        "mutants": 97,
+        "incompetent": 0,
+        "kill_rate": 0.959
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Add_Sub": 4,
+        "core/ReplaceBinaryOperator_Add_Mul": 4,
+        "core/ReplaceBinaryOperator_Add_Div": 4,
+        "core/ReplaceBinaryOperator_Add_FloorDiv": 4,
+        "core/ReplaceBinaryOperator_Add_Mod": 4,
+        "core/ReplaceBinaryOperator_Add_Pow": 4,
+        "core/ReplaceBinaryOperator_Add_RShift": 4,
+        "core/ReplaceBinaryOperator_Add_LShift": 4,
+        "core/ReplaceBinaryOperator_Add_BitOr": 4,
+        "core/ReplaceBinaryOperator_Add_BitAnd": 4,
+        "core/ReplaceBinaryOperator_Add_BitXor": 4,
+        "core/ReplaceComparisonOperator_Lt_Eq": 1,
+        "core/ReplaceComparisonOperator_Lt_NotEq": 1,
+        "core/ReplaceComparisonOperator_Lt_LtE": 1,
+        "core/ReplaceComparisonOperator_Lt_Gt": 1,
+        "core/ReplaceComparisonOperator_Lt_GtE": 1,
+        "core/ReplaceUnaryOperator_USub_UAdd": 5,
+        "core/ReplaceUnaryOperator_USub_Invert": 5,
+        "core/ReplaceUnaryOperator_USub_Not": 5,
+        "core/ReplaceUnaryOperator_Delete_USub": 5,
+        "core/AddNot": 1,
+        "core/NumberReplacer": 26,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/47",
+      "name": "median",
+      "green": 6,
+      "function": {
+        "killed": 95,
+        "mutants": 97,
+        "incompetent": 0,
+        "kill_rate": 0.979
+      },
+      "module": {
+        "killed": 95,
+        "mutants": 97,
+        "incompetent": 0,
+        "kill_rate": 0.979
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Add_Sub": 1,
+        "core/ReplaceBinaryOperator_Add_Mul": 1,
+        "core/ReplaceBinaryOperator_Add_Div": 1,
+        "core/ReplaceBinaryOperator_Add_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Add_Mod": 1,
+        "core/ReplaceBinaryOperator_Add_Pow": 1,
+        "core/ReplaceBinaryOperator_Add_RShift": 1,
+        "core/ReplaceBinaryOperator_Add_LShift": 1,
+        "core/ReplaceBinaryOperator_Add_BitOr": 1,
+        "core/ReplaceBinaryOperator_Add_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Add_BitXor": 1,
+        "core/ReplaceBinaryOperator_Sub_Add": 1,
+        "core/ReplaceBinaryOperator_Sub_Mul": 1,
+        "core/ReplaceBinaryOperator_Sub_Div": 1,
+        "core/ReplaceBinaryOperator_Sub_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Sub_Mod": 1,
+        "core/ReplaceBinaryOperator_Sub_Pow": 1,
+        "core/ReplaceBinaryOperator_Sub_RShift": 1,
+        "core/ReplaceBinaryOperator_Sub_LShift": 1,
+        "core/ReplaceBinaryOperator_Sub_BitOr": 1,
+        "core/ReplaceBinaryOperator_Sub_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Sub_BitXor": 1,
+        "core/ReplaceBinaryOperator_Div_Add": 1,
+        "core/ReplaceBinaryOperator_Div_Sub": 1,
+        "core/ReplaceBinaryOperator_Div_Mul": 1,
+        "core/ReplaceBinaryOperator_Div_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Div_Mod": 1,
+        "core/ReplaceBinaryOperator_Div_Pow": 1,
+        "core/ReplaceBinaryOperator_Div_RShift": 1,
+        "core/ReplaceBinaryOperator_Div_LShift": 1,
+        "core/ReplaceBinaryOperator_Div_BitOr": 1,
+        "core/ReplaceBinaryOperator_Div_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Div_BitXor": 1,
+        "core/ReplaceBinaryOperator_FloorDiv_Add": 3,
+        "core/ReplaceBinaryOperator_FloorDiv_Sub": 3,
+        "core/ReplaceBinaryOperator_FloorDiv_Mul": 3,
+        "core/ReplaceBinaryOperator_FloorDiv_Div": 3,
+        "core/ReplaceBinaryOperator_FloorDiv_Mod": 3,
+        "core/ReplaceBinaryOperator_FloorDiv_Pow": 3,
+        "core/ReplaceBinaryOperator_FloorDiv_RShift": 3,
+        "core/ReplaceBinaryOperator_FloorDiv_LShift": 3,
+        "core/ReplaceBinaryOperator_FloorDiv_BitOr": 3,
+        "core/ReplaceBinaryOperator_FloorDiv_BitAnd": 3,
+        "core/ReplaceBinaryOperator_FloorDiv_BitXor": 3,
+        "core/ReplaceBinaryOperator_Mod_Add": 1,
+        "core/ReplaceBinaryOperator_Mod_Sub": 1,
+        "core/ReplaceBinaryOperator_Mod_Mul": 1,
+        "core/ReplaceBinaryOperator_Mod_Div": 1,
+        "core/ReplaceBinaryOperator_Mod_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Mod_Pow": 1,
+        "core/ReplaceBinaryOperator_Mod_RShift": 1,
+        "core/ReplaceBinaryOperator_Mod_LShift": 1,
+        "core/ReplaceBinaryOperator_Mod_BitOr": 1,
+        "core/ReplaceBinaryOperator_Mod_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Mod_BitXor": 1,
+        "core/ReplaceComparisonOperator_Eq_NotEq": 1,
+        "core/ReplaceComparisonOperator_Eq_Lt": 1,
+        "core/ReplaceComparisonOperator_Eq_LtE": 1,
+        "core/ReplaceComparisonOperator_Eq_Gt": 1,
+        "core/ReplaceComparisonOperator_Eq_GtE": 1,
+        "core/AddNot": 1,
+        "core/NumberReplacer": 14
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/48",
+      "name": "is_palindrome",
+      "green": 6,
+      "function": {
+        "killed": 32,
+        "mutants": 35,
+        "incompetent": 0,
+        "kill_rate": 0.914
+      },
+      "module": {
+        "killed": 32,
+        "mutants": 35,
+        "incompetent": 0,
+        "kill_rate": 0.914
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Sub_Add": 2,
+        "core/ReplaceBinaryOperator_Sub_Mul": 2,
+        "core/ReplaceBinaryOperator_Sub_Div": 2,
+        "core/ReplaceBinaryOperator_Sub_FloorDiv": 2,
+        "core/ReplaceBinaryOperator_Sub_Mod": 2,
+        "core/ReplaceBinaryOperator_Sub_Pow": 2,
+        "core/ReplaceBinaryOperator_Sub_RShift": 2,
+        "core/ReplaceBinaryOperator_Sub_LShift": 2,
+        "core/ReplaceBinaryOperator_Sub_BitOr": 2,
+        "core/ReplaceBinaryOperator_Sub_BitAnd": 2,
+        "core/ReplaceBinaryOperator_Sub_BitXor": 2,
+        "core/ReplaceComparisonOperator_NotEq_Eq": 1,
+        "core/ReplaceComparisonOperator_NotEq_Lt": 1,
+        "core/ReplaceComparisonOperator_NotEq_LtE": 1,
+        "core/ReplaceComparisonOperator_NotEq_Gt": 1,
+        "core/ReplaceComparisonOperator_NotEq_GtE": 1,
+        "core/ReplaceComparisonOperator_NotEq_Is": 1,
+        "core/ReplaceComparisonOperator_NotEq_IsNot": 1,
+        "core/AddNot": 1,
+        "core/ReplaceTrueWithFalse": 1,
+        "core/ReplaceFalseWithTrue": 1,
+        "core/NumberReplacer": 2,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    },
+    {
+      "task_id": "HumanEval/49",
+      "name": "modp",
+      "green": 6,
+      "function": {
+        "killed": 27,
+        "mutants": 27,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "module": {
+        "killed": 27,
+        "mutants": 27,
+        "incompetent": 0,
+        "kill_rate": 1.0
+      },
+      "ops": {
+        "core/ReplaceBinaryOperator_Mul_Add": 1,
+        "core/ReplaceBinaryOperator_Mul_Sub": 1,
+        "core/ReplaceBinaryOperator_Mul_Div": 1,
+        "core/ReplaceBinaryOperator_Mul_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Mul_Mod": 1,
+        "core/ReplaceBinaryOperator_Mul_Pow": 1,
+        "core/ReplaceBinaryOperator_Mul_RShift": 1,
+        "core/ReplaceBinaryOperator_Mul_LShift": 1,
+        "core/ReplaceBinaryOperator_Mul_BitOr": 1,
+        "core/ReplaceBinaryOperator_Mul_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Mul_BitXor": 1,
+        "core/ReplaceBinaryOperator_Mod_Add": 1,
+        "core/ReplaceBinaryOperator_Mod_Sub": 1,
+        "core/ReplaceBinaryOperator_Mod_Mul": 1,
+        "core/ReplaceBinaryOperator_Mod_Div": 1,
+        "core/ReplaceBinaryOperator_Mod_FloorDiv": 1,
+        "core/ReplaceBinaryOperator_Mod_Pow": 1,
+        "core/ReplaceBinaryOperator_Mod_RShift": 1,
+        "core/ReplaceBinaryOperator_Mod_LShift": 1,
+        "core/ReplaceBinaryOperator_Mod_BitOr": 1,
+        "core/ReplaceBinaryOperator_Mod_BitAnd": 1,
+        "core/ReplaceBinaryOperator_Mod_BitXor": 1,
+        "core/NumberReplacer": 4,
+        "core/ZeroIterationForLoop": 1
+      },
+      "note": ""
+    }
+  ]
+}

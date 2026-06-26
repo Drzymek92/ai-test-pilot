@@ -3,11 +3,15 @@
 # M1 reads [run] and [generation]; [triage]/[tuning]/[ledger] are placeholders for M2+.
 
 [run]
-adapter        = "python_pytest"
-scenario_count = 6
-model_tier     = "bulk"          # LLM task tier (cheap | bulk | accurate); informational in M1
-prompt_version = "v1"            # pin a version, or "auto" = deterministic ledger-best for this adapter
-output_dir     = "scripts/outputs"
+adapter            = "python_pytest"
+scenario_count     = 6           # FLOOR (and the fixed count when autoscale is off)
+scenarios_per_unit = 3           # autoscale: ~this many scenarios PER unit under test (0 = fixed scenario_count).
+                                 # A fixed 6 under-tests multi-function modules (10 fns -> 0.6 scen/fn -> kill 0.37
+                                 # vs 0.93 at proper density). --count still overrides. See the blind-target study.
+scenario_max       = 30          # autoscale cap (token-budget bound)
+model_tier         = "bulk"      # LLM task tier (cheap | bulk | accurate); informational in M1
+prompt_version     = "v1"        # pin a version, or "auto" = deterministic ledger-best for this adapter
+output_dir         = "scripts/outputs"
 
 [generation]
 temperature       = 0.0          # P1: deterministic by default; raise only to diversify scenarios
@@ -53,6 +57,46 @@ fewshot_max_chars      = 1500        # token-budget bound on the exemplar block
 [ledger]
 backend = "duckdb"
 path    = "scripts/outputs/runs.duckdb"
+
+# ── bug-detection (kill-rate) eval — proof the generated tests CATCH bugs ───
+# Generates suites from CORRECT code, then re-runs them against buggy versions (QuixBugs verified
+# pairs + in-repo AST mutants) and reports the fraction caught. The ablation regenerates under
+# {naive,+cut_source,+golden,full} so each feature must earn its kill rate. `python scripts/main.py
+# detect` (--subset N bounds spend; re-runs are ~free via the P1 cache). Gate regression -> exit 7.
+[detection]
+corpus        = "both"        # both | quixbugs | mutation
+subset_size   = 20            # QuixBugs programs in a bounded run (--full for all 40; --subset N to override)
+max_mutants   = 6             # per-target AST-mutant cap (bounds the in-repo corpus)
+mutation_seed = 0             # deterministic mutant subset selection
+per_test_timeout = 4.0        # TIGHT per-test cap for kill-checks (healthy tests run <1s; a mutant over
+                              # this is looping -> killed fast, so infinite-loop mutants don't crawl)
+ablation      = true          # run the {naive,+cut_source,+golden,full} feature study
+detect_equivalent = true      # 4-lite: differential-fuzz survived mutants; drop behaviourally-equivalent
+                              # ones from the denominator (variant-independent) so kill rate is honest
+quixbugs_url  = "https://github.com/jkoppel/QuixBugs.git"
+
+# ── Approach 1: feedback-driven regeneration (close the loop with the coverage signal) ──
+# After the first generation, measure which target lines the suite NEVER executes (via
+# benchmark/cov.py) and re-prompt for ADDITIONAL scenarios whose inputs reach them. Only the
+# coverage gap is fed back — never any bug/mutant info — so the loop can't overfit a held-out bug
+# set. OPT-IN (each round is an extra LLM call → tokens): enable here or per run with --feedback.
+[feedback]
+enabled             = false   # turn the coverage-feedback loop on (python adapter only)
+max_rounds          = 1       # extra regeneration rounds (1-2; bounds token cost)
+count               = 3       # additional scenarios requested per feedback round
+min_uncovered_lines = 1       # skip feedback when fewer than this many lines are uncovered
+max_uncovered_shown = 25      # token-budget bound on the uncovered-lines block fed to the LLM
+probe_timeout       = 45      # HARD cap (s) on the coverage probe; a pathological test under `trace`
+                              # (e.g. exponential recursion) is killed + skipped, never left to hang/OOM
+
+# ── A3(c): typed-input fixture-injection hatch ───────────────────────────────
+# Map a type name → "dotted.module:builder_func" for domain objects the ast strategies can't build
+# (cyclic graphs, validator-heavy configs). When a target param is typed with one of these, the tool
+# imports your builder into the generated test and constructs the value by calling it; the model only
+# chooses the builder's arguments via the $type grammar. Empty by default. Example:
+#   [typed_inputs.builders]
+#   RulesConfig = "myproj.testkit.builders:make_rules_config"
+[typed_inputs.builders]
 
 # ── P4: cost/scale guardrails ─────────────────────────────────────────────────
 # Spend is always measured + recorded (tokens in/out, cost_est). Caps are opt-in: 0 = no cap,
