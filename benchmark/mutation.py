@@ -175,6 +175,60 @@ def _make_mutant(source: str, index: int, ranges: list[tuple[int, int]] | None) 
     return Mutant(index=index, operator=family, description=desc, source=ast.unparse(tree))
 
 
+_VALIDATOR_DECOS = {"field_validator", "model_validator", "validator", "root_validator"}
+
+
+def _validator_method(m: ast.AST) -> bool:
+    """True iff `m` is a pydantic validator method (`@field_validator`/`@model_validator`/…)."""
+    if not isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return False
+    for d in m.decorator_list:
+        callee = d.func if isinstance(d, ast.Call) else d
+        name = callee.attr if isinstance(callee, ast.Attribute) else getattr(callee, "id", "")
+        if name in _VALIDATOR_DECOS:
+            return True
+    return False
+
+
+def _weaken_validator(source: str, cls_name: str, method_name: str) -> str:
+    """Replace a validator's body with `return <last arg>` — it now ACCEPTS anything (guard removed)."""
+    tree = ast.parse(source)
+
+    class _T(ast.NodeTransformer):
+        def visit_ClassDef(self, node: ast.ClassDef) -> ast.AST:
+            if node.name == cls_name:
+                for m in node.body:
+                    if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)) and m.name == method_name:
+                        allp = list(m.args.posonlyargs) + list(m.args.args)
+                        ret: ast.expr = ast.Name(allp[-1].arg, ast.Load()) if allp else ast.Constant(None)
+                        m.body = [ast.Return(ret)]
+            return node
+
+    ast.fix_missing_locations(_T().visit(tree))
+    return ast.unparse(tree)
+
+
+def validator_weakening_mutants(source: str) -> list[Mutant]:
+    """Mutants that WEAKEN each pydantic validator (drop its guard → accepts out-of-contract values).
+
+    This is the bug class a valid-only suite is blind to (every valid input still passes) and a rejection-test
+    rejection test catches (an invalid input is now wrongly accepted, so the `pytest.raises` fails).
+    Distinct from the operator-swap `generate_mutants` — a structural weakening, the deletion-style
+    operator the publish plan flagged. ast-only, deterministic (one mutant per validator method)."""
+    tree = ast.parse(source)
+    out: list[Mutant] = []
+    for cls in tree.body:
+        if not isinstance(cls, ast.ClassDef):
+            continue
+        for m in cls.body:
+            if _validator_method(m):
+                mutated = _weaken_validator(source, cls.name, m.name)
+                if mutated != source:
+                    out.append(Mutant(index=len(out), operator="validator",
+                                      description=f"weaken validator {cls.name}.{m.name}", source=mutated))
+    return out
+
+
 def generate_mutants(source: str, *, selector: set[str] | None = None,
                      max_count: int | None = None, seed: int = 0) -> list[Mutant]:
     """All single-operator mutants of `source` (or a seeded subset of `max_count`).

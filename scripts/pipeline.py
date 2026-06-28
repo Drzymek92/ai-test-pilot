@@ -220,6 +220,17 @@ def run_pipeline(cfg: AppConfig, args: RunRequest) -> RunReport:
                                    cwd=_PROJECT_ROOT, out_dir=out_base / "tests")
         apply_goldens(scenario_set, captures)
 
+    # 2.7 — REJECTION TESTS (opt-in, python adapter): deterministic validator-rejection scenarios
+    # (no LLM) that assert an out-of-contract value is refused at construction. Added AFTER golden so
+    # golden never tries to capture a deliberately-raising call.
+    if (cfg.generation.rejection_tests or args.reject_tests) and is_python:
+        from scripts.core.rejection import rejection_scenarios
+        rejects = rejection_scenarios(contract)
+        if rejects:
+            scenario_set.scenarios.extend(rejects)
+            logger.info("Rejection tests: added %d deterministic validator-rejection scenario(s).",
+                        len(rejects))
+
     # web: force the asyncio Playwright variant for every scenario when requested
     if args.web_async:
         for s in scenario_set.scenarios:

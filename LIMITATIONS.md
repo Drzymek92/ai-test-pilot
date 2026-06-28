@@ -12,11 +12,21 @@ The tool is validated on a curated set of target shapes (typed business-rules en
 data-transformation helpers, web forms, an authenticated app, a WebSocket feed). Outside that set,
 quality degrades gracefully but is **not** guaranteed. Known out-of-scope input shapes:
 
-- **Constrained / exotic types it won't construct:** params gated by a custom pydantic
-  `@field_validator`, a `Union` of several project types, alternate constructors (classmethods /
-  factory functions), and fixture-injected params. These hit the deterministic **warn-and-skip**
-  guard rather than producing a wrong test. (Declarative pydantic `Field` constraints — `gt`/`le`/
-  `min_length`/`Annotated[...]` — plus `attrs` and `NamedTuple` *are* now constructed, per P3b.)
+- **Constrained / exotic types:** **fixture-injected params** still hit the deterministic
+  **warn-and-skip** guard rather than producing a wrong test. (Declarative pydantic `Field`
+  constraints — `gt`/`le`/`min_length`/`Annotated[...]` — plus `attrs` and `NamedTuple` are
+  constructed per P3b; **alternate constructors — `@classmethod`/`@staticmethod` factories and
+  module-level factory functions annotated `-> Type` — are constructed via producer-set resolution,
+  and a `Union` of project types is handled, per Phase 1**; and **custom pydantic
+  `@field_validator`/`@model_validator` constraints are now surfaced to the model** — it lifts the
+  validator's own message so it picks values that satisfy the rule instead of tripping it, per Phase 3.)
+- **Validator rejection paths** are tested only with **`--reject-tests`** (opt-in, off by default). With
+  it on, the tool emits a deterministic test that a validator-gated pydantic type *refuses* an
+  out-of-contract value at construction (`pytest.raises(ValidationError)`), with the invalid value derived
+  by inverting the validator guard — but only for **invertible `@field_validator`s** (a membership set or
+  a numeric range). Cross-field `@model_validator` rejection, and validators whose guard can't be cleanly
+  inverted, are skipped (never a guessed "invalid" value that might actually be valid). Default runs build
+  *valid* objects only and don't exercise the reject path.
 - **Third-party / dynamic parameter types** are not resolved from source — flagged as
   `complex_params` and skipped, not guessed.
 - **Assertion strength:** for computed results the LLM asserts *type + structure*, not exact math,

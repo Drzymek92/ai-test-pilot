@@ -79,6 +79,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         "regenerate to reach them (extra LLM round[s] → tokens; python adapter only)")
     p.add_argument("--no-feedback", action="store_true",
                    help="disable the coverage-feedback loop even if enabled in config")
+    # deterministic validator-rejection tests (no LLM; python adapter)
+    p.add_argument("--reject-tests", dest="reject_tests", action="store_true",
+                   help="also emit deterministic tests that a validator-gated type REFUSES an "
+                        "out-of-contract value at construction (no LLM; python adapter)")
     # web adapter — deep-Playwright options
     p.add_argument("--serve", action="store_true",
                    help="web: serve the target's directory over localhost http so the generated tests "

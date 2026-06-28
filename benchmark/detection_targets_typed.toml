@@ -1,0 +1,33 @@
+# Phase-0 typed-input LONG-TAIL detection corpus (design/IMPROVEMENT_APPROACHES.md Phases 1-3).
+# Each target is a shape LIMITATIONS.md lists as NOT constructed correctly today (validator-gated
+# pydantic, validator-heavy nested config, Union-of-types, factory/opaque __init__) -> expected
+# green~0 = the RED baseline that Phases 1-3 must lift. DISTINCT from detection_targets_a3.toml
+# (plain classes A3 already builds via __init__).
+#
+# Run (NO --update-baseline: the comparison vs detection_baseline.json is meaningless for this
+# separate corpus, and --update-baseline would CLOBBER the tracked dev baseline):
+#   python scripts/main.py detect --corpus mutation --manifest benchmark/detection_targets_typed.toml --no-ablation
+#
+# Read the per-target `green` column in the run JSON/MD under benchmark/eval/runs/ — that is the
+# construction-success signal this corpus exists to measure. Re-runs are ~free via the P1 cache.
+# This is a SEPARATE corpus — do NOT fold its numbers into detection_baseline.json / EVAL_DETECTION.md.
+
+[[target]]
+name     = "typed_coupon_validator"      # pydantic @field_validator, narrow valid set — Phase 3
+path     = "benchmark/fixtures/typed_longtail_sample.py"
+selector = "discounted_price"
+
+[[target]]
+name     = "typed_quote_modelvalidator"  # nested pydantic + Decimal + @model_validator — Phase 2
+path     = "benchmark/fixtures/typed_longtail_sample.py"
+selector = "quote_total"
+
+[[target]]
+name     = "typed_payment_union"         # Union[Cash, Card] of project types — Phase 1
+path     = "benchmark/fixtures/typed_longtail_sample.py"
+selector = "settle"
+
+[[target]]
+name     = "typed_account_factory"       # factory-built, opaque no-arg __init__ — Phase 1
+path     = "benchmark/fixtures/typed_longtail_sample.py"
+selector = "credit_limit"

@@ -26,6 +26,7 @@ cache             = true         # P1: replay scenarios for an unchanged target+
 llm_timeout       = 60.0         # P2: seconds per LLM request before retry
 llm_retries       = 2            # P2: transient-failure retries after the first attempt (exponential backoff)
 per_test_timeout  = 15.0         # P2: per-test budget; bounds the run so a hanging test can't hang the pipeline (0 = off)
+rejection_tests   = false        # also emit deterministic validator-rejection tests (--reject-tests; python adapter, no LLM)
 
 # ── data-factory fixture provider (integration feature) ──────────────────────
 # When enabled, data-processing targets get realistic synthetic inputs from

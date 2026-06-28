@@ -239,6 +239,9 @@ python scripts/main.py --target path/to/module.py --selector func_a,func_b
 # lock assertions to real results (characterization / regression mode)
 python scripts/main.py --target path/to/module.py --golden
 
+# also emit deterministic validator-rejection tests (a validator-gated pydantic type refuses bad input)
+python scripts/main.py --target path/to/module.py --reject-tests
+
 # generate Playwright tests for a web page
 python scripts/main.py --adapter web_playwright --target path/to/page.html
 

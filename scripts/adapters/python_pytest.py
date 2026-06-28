@@ -14,6 +14,7 @@ import builtins
 import functools
 import re
 from pathlib import Path
+from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -338,7 +339,124 @@ def _field_constraint(node: ast.AnnAssign) -> str | None:
     return None
 
 
+def _raise_messages(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
+    """The human-readable messages a validator raises (constant-seeding, Phase 3): an author-written
+    `raise ValueError("percent must be one of 5/10/15/20")` is the strongest, most robust signal of
+    the valid value set — surfaced to the model so it picks values that don't trip the validator."""
+    out: list[str] = []
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Raise) and isinstance(node.exc, ast.Call) and node.exc.args:
+            arg0 = node.exc.args[0]
+            if isinstance(arg0, ast.Constant) and isinstance(arg0.value, str):
+                out.append(arg0.value.strip())
+            else:                                          # f-string / other → readable unparse
+                try:
+                    out.append(ast.unparse(arg0))
+                except Exception:
+                    pass
+    return out
+
+
+def _validator_constraints(cls: ast.ClassDef) -> dict[str, list[str]]:
+    """Phase 3: per-field constraint messages lifted from pydantic `@field_validator` /
+    `@model_validator` bodies. `@field_validator("f")` → its named field(s); `@model_validator`
+    (cross-field) → every `self.X` field its body references. ast-only; no validator is executed.
+    """
+    per_field: dict[str, list[str]] = {}
+    for node in cls.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for deco in node.decorator_list:
+            if not isinstance(deco, ast.Call):
+                continue
+            dname = _name_of(deco.func)
+            if dname == "field_validator":
+                targets = [a.value for a in deco.args
+                           if isinstance(a, ast.Constant) and isinstance(a.value, str)]
+            elif dname == "model_validator":
+                self_name = node.args.args[0].arg if node.args.args else "self"
+                targets = sorted({n.attr for n in ast.walk(node)
+                                  if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)
+                                  and n.value.id == self_name})
+            else:
+                continue
+            msgs = _raise_messages(node)
+            for t in (targets if msgs else []):
+                per_field.setdefault(t, []).extend(msgs)
+    return per_field
+
+
+def _merge_constraint(base: str | None, extra: list[str] | None) -> str | None:
+    """Join a structured constraint (Field gt=/le=…) with validator messages into one bracket text."""
+    parts = ([base] if base else []) + (extra or [])
+    return "; ".join(parts) if parts else None
+
+
+def _num_literal(node: ast.expr) -> float | int | None:
+    """A numeric value from a plain Constant or a `Decimal('…')` call (for range inversion)."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
+        return node.value
+    if isinstance(node, ast.Call) and _name_of(node.func) == "Decimal" and node.args \
+            and isinstance(node.args[0], ast.Constant):
+        try:
+            return float(node.args[0].value)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _invalid_from_validator(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> Any:
+    """Inverter: a provably-INVALID value for a `@field_validator` whose guard is cleanly
+    invertible — a membership set (`v not in (lits)`) or a numeric range (`not (lo <= v <= hi)`).
+    Returns a value-grammar node (a primitive, or `{"$call": "Decimal", ...}`) or None (skip — never
+    a guessed value that might actually be valid). ast-only; the validator is never executed."""
+    for node in ast.walk(fn):
+        if not (isinstance(node, ast.If) and any(isinstance(n, ast.Raise) for n in ast.walk(node))):
+            continue
+        test = node.test
+        # membership exclusion: `v not in (int literals)` → any int outside the set
+        if isinstance(test, ast.Compare) and len(test.ops) == 1 and isinstance(test.ops[0], ast.NotIn):
+            comp = test.comparators[0]
+            if isinstance(comp, (ast.Tuple, ast.List)):
+                lits = [e.value for e in comp.elts if isinstance(e, ast.Constant)]
+                if lits and all(isinstance(x, int) and not isinstance(x, bool) for x in lits):
+                    s = set(lits)
+                    return next((c for c in range(0, 1000) if c not in s), max(s) + 1)
+        # numeric range: `not (lo <= v <= hi)` → just above the upper bound
+        if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not) \
+                and isinstance(test.operand, ast.Compare):
+            cmp = test.operand
+            if len(cmp.ops) == 2 and all(isinstance(o, (ast.Lt, ast.LtE)) for o in cmp.ops):
+                hi = cmp.comparators[-1]
+                val = _num_literal(hi)
+                if val is not None:
+                    rej = val + 1
+                    if isinstance(hi, ast.Call) and _name_of(hi.func) == "Decimal":
+                        return {"$call": "Decimal", "args": [str(rej)]}
+                    return int(rej) if isinstance(val, int) else rej
+    return None
+
+
+def _validator_reject_examples(cls: ast.ClassDef) -> dict[str, Any]:
+    """Per-field invalid examples from invertible `@field_validator`s (model_validator cross-field
+    rejection is deferred — its invalid combo isn't a single-field value)."""
+    out: dict[str, Any] = {}
+    for node in cls.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for deco in node.decorator_list:
+            if isinstance(deco, ast.Call) and _name_of(deco.func) == "field_validator":
+                inv = _invalid_from_validator(node)
+                if inv is not None:
+                    for a in deco.args:
+                        if isinstance(a, ast.Constant) and isinstance(a.value, str):
+                            out[a.value] = inv
+    return out
+
+
 def _extract_fields(cls: ast.ClassDef) -> list[FieldSpec]:
+    vmsgs = _validator_constraints(cls)                    # Phase 3: validator-derived constraints
+    rejex = _validator_reject_examples(cls)                # per-field invalid examples
     fields: list[FieldSpec] = []
     for node in cls.body:
         if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
@@ -350,7 +468,8 @@ def _extract_fields(cls: ast.ClassDef) -> list[FieldSpec]:
                 continue
             fields.append(FieldSpec(name=n, annotation=ann or None,
                                     has_default=_field_has_default(node.value),
-                                    constraint=_field_constraint(node)))
+                                    constraint=_merge_constraint(_field_constraint(node), vmsgs.get(n)),
+                                    reject_example=rejex.get(n)))
         # old-style attrs: `x = attr.ib(...)` / `x = field(...)` (no annotation)
         elif isinstance(node, ast.Assign) and _is_field_call(node.value) \
                 and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
@@ -359,7 +478,8 @@ def _extract_fields(cls: ast.ClassDef) -> list[FieldSpec]:
                 continue
             fields.append(FieldSpec(name=n, annotation=None,
                                     has_default=_field_has_default(node.value),
-                                    constraint=_constraints_from_call(node.value)))
+                                    constraint=_merge_constraint(_constraints_from_call(node.value),
+                                                                 vmsgs.get(n))))
     return fields
 
 
@@ -401,6 +521,65 @@ def _init_fields(cls: ast.ClassDef) -> list[FieldSpec] | None:
         fields.append(FieldSpec(name=arg.arg, annotation=_annotation_str(arg.annotation),
                                 has_default=d is not None))
     return fields
+
+
+def _producer_fields(fn: ast.FunctionDef | ast.AsyncFunctionDef, *, drop_first: bool) -> list[FieldSpec]:
+    """FieldSpecs for a factory callable's params (drop the leading self/cls when `drop_first`).
+
+    Mirrors `_init_fields` but for an alternate constructor (classmethod / module function). Returns
+    [] when there are no nameable params (e.g. only `*args`) — a no-arg factory is no better than the
+    bare `Name()` fallback, so the caller skips it.
+    """
+    a = fn.args
+    allp = list(a.posonlyargs) + list(a.args)
+    if a.vararg and len(allp) <= (1 if drop_first else 0):
+        return []                                  # only `*args` → no nameable params
+    n_def = len(a.defaults)
+    defaulted = set(range(len(allp) - n_def, len(allp)))
+    out: list[FieldSpec] = []
+    for i in range(1 if drop_first else 0, len(allp)):
+        arg = allp[i]
+        out.append(FieldSpec(name=arg.arg, annotation=_annotation_str(arg.annotation),
+                             has_default=i in defaulted))
+    for arg, d in zip(a.kwonlyargs, a.kw_defaults):
+        out.append(FieldSpec(name=arg.arg, annotation=_annotation_str(arg.annotation),
+                             has_default=d is not None))
+    return out
+
+
+def _find_producer(name: str, cls: ast.ClassDef, def_path: Path, def_module: str) -> TypeSpec | None:
+    """Phase 1 producer-set resolution: when a type's own `__init__` is uninformative, find an
+    ALTERNATE constructor so the REAL object is built instead of a fabricated `__init__` call.
+
+    Two ast-readable producers (never imports the target), checked in order:
+      1. a `@classmethod` / `@staticmethod` on the class whose return annotation is this type
+         (e.g. `Money.of(dollars, cents) -> "Money"`), then
+      2. a module-level function annotated `-> name` (e.g. `open_account(balance, tier) -> Account`).
+    Returns a `TypeSpec(kind="producer")` (rendered via the existing `$type` grammar) or None.
+    """
+    for node in cls.body:                          # 1) classmethod / staticmethod factory
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        deco = {_name_of(d.func if isinstance(d, ast.Call) else d) for d in node.decorator_list}
+        is_cm, is_sm = "classmethod" in deco, "staticmethod" in deco
+        if not (is_cm or is_sm) or _name_of(node.returns) != name:
+            continue
+        fields = _producer_fields(node, drop_first=is_cm)
+        if fields:
+            return TypeSpec(name=name, kind="producer", module=def_module, fields=fields,
+                            builder=f"{name}.{node.name}", import_symbol=name,
+                            usage_hint=f"{name}.{node.name}(...)")
+    for node in _parse_module(str(def_path)).body:  # 2) module-level factory function `-> name`
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if _name_of(node.returns) != name:
+            continue
+        fields = _producer_fields(node, drop_first=False)
+        if fields:
+            return TypeSpec(name=name, kind="producer", module=def_module, fields=fields,
+                            builder=node.name, import_symbol=node.name,
+                            usage_hint=f"{node.name}(...)")
+    return None
 
 
 def _duck_attrs(fn: ast.FunctionDef | ast.AsyncFunctionDef, param: str) -> list[str]:
@@ -472,13 +651,21 @@ def resolve_type(name: str, project_root: Path, importing_module: Path,
         types[name] = TypeSpec(name=name, kind="enum", module=def_module,
                                enum_members=_enum_members(cls))
         return
-    if kind is None:                               # A3(b): plain class → construct via __init__
+    if kind is None:                               # plain class → __init__ (A3b) or a producer (Phase 1)
         init_fields = _init_fields(cls)
-        if init_fields is None:                    # not reliably constructible → leave for duck pass
+        # Prefer an alternate constructor (classmethod / module factory) only when `__init__` itself
+        # is uninformative ([] no-arg / None unconstructible) — so classes with a real `__init__`
+        # keep building via it (no regression), but a factory-built type stops fabricating a ctor.
+        producer = _find_producer(name, cls, def_path, def_module) if not init_fields else None
+        if producer is not None:
+            types[name] = producer
+            fields = producer.fields
+        elif init_fields is None:                  # no producer + unconstructible __init__ → duck pass
             return
-        types[name] = TypeSpec(name=name, kind="initclass", module=def_module, fields=init_fields,
-                               usage_hint=_ctor_hint(_parse_module(str(def_path)), name))
-        fields = init_fields
+        else:
+            types[name] = TypeSpec(name=name, kind="initclass", module=def_module, fields=init_fields,
+                                   usage_hint=_ctor_hint(_parse_module(str(def_path)), name))
+            fields = init_fields
     else:
         fields = _extract_fields(cls)
         types[name] = TypeSpec(name=name, kind=kind, module=def_module, fields=fields)
@@ -607,6 +794,8 @@ def file_header(contract: TargetContract, scenarios=()) -> str:
         elif ts.kind == "builder" and ts.builder:    # A3(c): import the user builder function
             mod, _, func = ts.builder.partition(":")
             by_module.setdefault(mod, set()).add(func)
+        elif ts.kind == "producer" and ts.import_symbol:   # Phase 1: import the factory fn / class
+            by_module.setdefault(ts.module, set()).add(ts.import_symbol)
         else:                                        # structured / initclass → import the real type
             by_module.setdefault(ts.module, set()).add(nm)
     for nm in calls_used:                            # scalar ctors → stdlib module
@@ -615,6 +804,8 @@ def file_header(contract: TargetContract, scenarios=()) -> str:
             by_module.setdefault(mod, set()).add(nm)
 
     extra = ("from types import SimpleNamespace\n" if need_simplenamespace else "")
+    if any(getattr(s, "expect_error", None) == "ValidationError" for s in scenarios):
+        extra += "from pydantic import ValidationError\n"        # rejection tests assert on it
     extra += "".join(f"from {mod} import {', '.join(sorted(names))}\n"
                      for mod, names in sorted(by_module.items()))
 
@@ -662,6 +853,8 @@ def _type_callable(ts: TypeSpec) -> str:
         return "SimpleNamespace"
     if ts.kind == "builder" and ts.builder:
         return ts.builder.split(":")[-1]
+    if ts.kind == "producer" and ts.builder:       # Phase 1: the alternate-constructor call expr
+        return ts.builder                          # ("open_account" | "Money.of")
     return ts.name
 
 
@@ -702,14 +895,23 @@ def _render_value(node, render: dict[str, str] | None = None) -> str:
 
 
 # ── value-grammar allow-list (security: the model authors JSON, never code tokens) ──
-def _check_value(node, *, types: set[str], enums: dict[str, list[str]]) -> None:
+def _check_value(node, *, types: set[str], enums: dict[str, list[str]],
+                 fields_by_type: dict[str, set[str]] | None = None) -> None:
     """Reject any value-grammar node that would render a symbol/name the tool did not
     itself resolve. Every `$type`/`$call`/`$enum` and every kwarg name is interpolated
     raw into a code position by `_render_value`, so this is the guard that keeps the
     'every line rendered deterministically, never written by the model' invariant true.
     Raises ValueError (routed through generate()'s repair-retry; also a render-time
     safety net in emit/probe_source). Primitives are repr()'d and need no check.
+
+    `fields_by_type` maps a type whose constructor signature the tool resolved exactly
+    (`initclass` / `producer`) to its allowed argument names; a `$type` kwarg outside that
+    set is rejected — this is what stops the model fabricating a constructor (e.g.
+    `Account(tier=, balance=)` against a no-arg `__init__`). Types absent from the map
+    (structured/duck/builder, whose full arg set the tool can't enumerate) keep the looser
+    identifier-only check.
     """
+    fields_by_type = fields_by_type or {}
     if isinstance(node, dict):
         if "$type" in node:
             t = node["$type"]
@@ -720,10 +922,15 @@ def _check_value(node, *, types: set[str], enums: dict[str, list[str]]) -> None:
             args = node.get("args") or {}
             if not isinstance(args, dict):
                 raise ValueError(f"value grammar: $type {t!r} 'args' must be a name->value object")
+            allowed_args = fields_by_type.get(t)
             for k, v in args.items():
                 if not (isinstance(k, str) and k.isidentifier()):
                     raise ValueError(f"value grammar: invalid argument name {k!r} for $type {t!r}")
-                _check_value(v, types=types, enums=enums)
+                if allowed_args is not None and k not in allowed_args:
+                    raise ValueError(
+                        f"value grammar: $type {t!r} got unknown argument {k!r} — not a resolved "
+                        f"constructor field (allowed: {sorted(allowed_args)})")
+                _check_value(v, types=types, enums=enums, fields_by_type=fields_by_type)
             return
         if "$call" in node:
             f = node["$call"]
@@ -736,10 +943,10 @@ def _check_value(node, *, types: set[str], enums: dict[str, list[str]]) -> None:
                 for k, v in args.items():
                     if not (isinstance(k, str) and k.isidentifier()):
                         raise ValueError(f"value grammar: invalid argument name {k!r} for $call {f!r}")
-                    _check_value(v, types=types, enums=enums)
+                    _check_value(v, types=types, enums=enums, fields_by_type=fields_by_type)
             else:
                 for v in args:
-                    _check_value(v, types=types, enums=enums)
+                    _check_value(v, types=types, enums=enums, fields_by_type=fields_by_type)
             return
         if "$enum" in node:
             ref = node["$enum"]
@@ -756,10 +963,10 @@ def _check_value(node, *, types: set[str], enums: dict[str, list[str]]) -> None:
                     f"value grammar: $enum {ref!r} member not in {base} (members: {members})")
             return
         for v in node.values():                          # plain dict literal — repr'd keys, recurse values
-            _check_value(v, types=types, enums=enums)
+            _check_value(v, types=types, enums=enums, fields_by_type=fields_by_type)
     elif isinstance(node, list):
         for v in node:
-            _check_value(v, types=types, enums=enums)
+            _check_value(v, types=types, enums=enums, fields_by_type=fields_by_type)
 
 
 # ── assertion / expect_error allow-list (security: both are interpolated RAW into executed
@@ -857,13 +1064,19 @@ def validate_scenario(scenario: TestScenario, contract: TargetContract) -> None:
     own source. Raises ValueError on any unknown symbol (routed through the repair-retry)."""
     types = set(contract.types)
     enums = {n: t.enum_members for n, t in contract.types.items() if t.kind == "enum"}
+    # Types whose exact constructor signature the tool resolved → enforce kwargs ⊆ fields (stops a
+    # fabricated constructor). Looser kinds (structured/duck/builder) are omitted on purpose.
+    fields_by_type = {n: {f.name for f in t.fields}
+                      for n, t in contract.types.items() if t.kind in ("initclass", "producer")}
     for v in scenario.inputs.values():
-        _check_value(v, types=types, enums=enums)
+        _check_value(v, types=types, enums=enums, fields_by_type=fields_by_type)
     if scenario.assertion:
         allowed = {"result"} | _ASSERT_BUILTINS | set(_SCALAR_IMPORTS) | types
         _check_assertion(scenario.assertion, allowed)
     if scenario.expect_error:
-        _check_expect_error(scenario.expect_error, _BUILTIN_EXCEPTIONS | types)
+        # pydantic's ValidationError (raised at construction by a validator) is a known, safe
+        # exception symbol for rejection tests — allowed alongside builtins + resolved project types.
+        _check_expect_error(scenario.expect_error, _BUILTIN_EXCEPTIONS | types | {"ValidationError"})
 
 
 def _collect_symbols(node, types_used: set, calls_used: set, enums_used: set) -> None:

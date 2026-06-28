@@ -53,6 +53,7 @@ class GenCfg(BaseModel):
     llm_timeout: float = 60.0         # P2: seconds per LLM request
     llm_retries: int = 2              # P2: transient-failure retries after the first attempt
     per_test_timeout: float = 15.0    # P2: per-test budget → bounds the run (0 = no cap)
+    rejection_tests: bool = False     # also emit deterministic validator-rejection tests (opt-in)
 
 
 class FixturesCfg(BaseModel):

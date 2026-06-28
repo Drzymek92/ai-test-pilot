@@ -50,6 +50,7 @@ class FieldSpec(BaseModel):
     annotation: str | None = None
     has_default: bool = False         # omit from a constructor call to accept the default
     constraint: str | None = None     # P3b-2: value constraints to respect, e.g. "gt=0, le=100" (pydantic Field/con*)
+    reject_example: Any = None        # a provably-INVALID value for this field (inverted validator guard), or None
 
 
 class TypeSpec(BaseModel):
@@ -64,15 +65,21 @@ class TypeSpec(BaseModel):
                      attributes the function body actually reads (inferred from in-body usage).
       - `builder`:   a user-provided builder (config) constructs it — the safe hatch for types the
                      above can't build (cyclic graphs, validator-heavy configs).
-    All four render through the SAME `$type` value grammar + allow-list, so the model still only
+      - `producer`:  Phase 1 producer-set resolution — when a type's own `__init__` is uninformative,
+                     an ALTERNATE constructor discovered from source (a `@classmethod` factory or a
+                     module-level function annotated `-> Type`) builds the REAL object. `builder` holds
+                     the call expression ("open_account" / "Money.of"); `import_symbol` what to import.
+    All render through the SAME `$type` value grammar + allow-list, so the model still only
     authors JSON. `module` is "" for `duck`/`builder` (synthesized / imported via `builder`).
     """
     name: str
-    kind: Literal["dataclass", "pydantic", "enum", "attrs", "namedtuple", "initclass", "duck", "builder"]
+    kind: Literal["dataclass", "pydantic", "enum", "attrs", "namedtuple", "initclass", "duck",
+                  "builder", "producer"]
     module: str                       # importable module the type lives in ("" for duck/builder)
-    fields: list[FieldSpec] = Field(default_factory=list)   # dataclass/pydantic/initclass; duck=attrs
+    fields: list[FieldSpec] = Field(default_factory=list)   # dataclass/pydantic/initclass/producer; duck=attrs
     enum_members: list[str] = Field(default_factory=list)   # enum only (member names)
-    builder: str | None = None        # A3(c): "dotted.module:func" used to build a `builder` type
+    builder: str | None = None        # A3(c) builder: "dotted.module:func"; producer: the call expr
+    import_symbol: str | None = None  # producer only: the symbol to import from `module` (func or class)
     usage_hint: str | None = None     # A3(b): observed construction from callers, e.g. "Node(value=, successors=)"
 
 
@@ -188,6 +195,7 @@ class RunRequest(BaseModel):
     golden: bool = False
     feedback: bool = False             # A1 coverage-feedback loop
     no_feedback: bool = False
+    reject_tests: bool = False         # also emit deterministic validator-rejection tests
     serve: bool = False                # web adapter (served mode)
     web_async: bool = False
 
